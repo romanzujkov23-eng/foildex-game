@@ -34,6 +34,7 @@ function defaultState() {
     wins: 0,
     losses: 0,
     lastDaily: 0,
+    soundOn: true,
   };
 }
 
@@ -44,6 +45,8 @@ async function loadState() {
   } else {
     state = defaultState();
   }
+  if (state.soundOn === undefined) state.soundOn = true;
+  SoundSystem.setEnabled(state.soundOn);
 }
 
 async function saveState() {
@@ -110,7 +113,7 @@ function buildCardNode(card, opts = {}) {
       <span class="card-cost">⏳${card.cost}</span>
       <span class="card-rarity-dot"></span>
     </div>
-    <div class="card-art">${locked ? '❔' : ELEMENTS[card.element].emoji}</div>
+    <div class="card-art">${locked ? '<span class="card-art-locked">❔</span>' : CardArt.render(card)}</div>
     <div class="card-name">${locked ? '???' : card.name}</div>
     <div class="card-ability">${locked ? '' : abilityText}</div>
     <div class="card-stats">
@@ -162,6 +165,7 @@ function renderHome() {
       state.lastDaily = Date.now();
       await saveState();
       haptic('success');
+      SoundSystem.coin();
       toast(`+${DAILY_BONUS} 💎`);
       renderHome();
     };
@@ -177,7 +181,7 @@ function renderHome() {
     const btn = document.createElement('button');
     btn.className = 'btn';
     btn.textContent = 'Открыть бесплатно';
-    btn.onclick = () => startPackFlow({ free: true });
+    btn.onclick = () => { SoundSystem.tap(); startPackFlow({ free: true }); };
     free.appendChild(btn);
     el.appendChild(free);
   }
@@ -202,7 +206,7 @@ function renderHome() {
   buyBtn.className = 'pack-buy';
   buyBtn.textContent = `${BOOSTER_COST} 💎`;
   buyBtn.disabled = state.shards < BOOSTER_COST;
-  buyBtn.onclick = () => startPackFlow({ free: false });
+  buyBtn.onclick = () => { SoundSystem.tap(); startPackFlow({ free: false }); };
   row.appendChild(buyBtn);
   shopPanel.appendChild(row);
   el.appendChild(shopPanel);
@@ -271,6 +275,7 @@ async function openPack({ free }) {
   if (pendingPaymentDone) return;
   pendingPaymentDone = true;
   haptic('medium');
+  SoundSystem.packShake();
 
   const visual = document.getElementById('pack-visual');
   visual.classList.add('opening');
@@ -304,6 +309,7 @@ function showRevealCard() {
 
   const rarityHaptic = { common: 'light', uncommon: 'medium', rare: 'heavy', epic: 'success', legendary: 'success' };
   haptic(rarityHaptic[card.rarity] || 'light');
+  SoundSystem.reveal(card.rarity);
 
   const btn = document.getElementById('reveal-next-btn');
   btn.textContent = revealIndex < pendingCards.length - 1 ? 'Далее' : 'Забрать карты';
@@ -441,15 +447,16 @@ async function runBattle() {
     line.textContent = result.log[i];
     logBox.appendChild(line);
     logBox.scrollTop = logBox.scrollHeight;
+    if (result.log[i].includes('⚔️')) SoundSystem.battleHit();
     i++;
   }, 260);
 }
 
 async function finishBattle(result) {
   let reward = 10;
-  if (result.playerWon) { reward = 35; state.wins += 1; haptic('success'); }
+  if (result.playerWon) { reward = 35; state.wins += 1; haptic('success'); SoundSystem.victory(); }
   else if (result.draw) { reward = 18; haptic('warning'); }
-  else { reward = 10; state.losses += 1; haptic('error'); }
+  else { reward = 10; state.losses += 1; haptic('error'); SoundSystem.defeat(); }
 
   state.shards += reward;
   await saveState();
@@ -474,6 +481,7 @@ async function finishBattle(result) {
 function bindStaticEvents() {
   document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
+      SoundSystem.tap();
       const key = tab.dataset.tab;
       showScreen(TAB_SCREENS[key]);
       if (key === 'home') renderHome();
@@ -482,7 +490,16 @@ function bindStaticEvents() {
     });
   });
 
+  document.getElementById('sound-toggle-btn').addEventListener('click', async (e) => {
+    state.soundOn = !state.soundOn;
+    SoundSystem.setEnabled(state.soundOn);
+    e.currentTarget.textContent = state.soundOn ? '🔊' : '🔇';
+    if (state.soundOn) SoundSystem.tap();
+    await saveState();
+  });
+
   document.getElementById('pack-back-btn').addEventListener('click', () => {
+    SoundSystem.tap();
     showScreen('screen-home');
     renderHome();
   });
@@ -512,6 +529,7 @@ async function init() {
   }
   await loadState();
   bindStaticEvents();
+  document.getElementById('sound-toggle-btn').textContent = state.soundOn ? '🔊' : '🔇';
   showScreen('screen-home');
   renderHome();
   await saveState();
