@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>FoilDex — карточный коллекционер</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+<div id="app">
+  <div id="toast-root"></div>
+
+  <!-- ===== HOME ===== -->
+  <div class="screen active" id="screen-home">
+    <div class="topbar">
+      <div class="brand">FOIL<span>DEX</span></div>
+      <div class="currency"><span class="icon">💎</span><span id="shard-count">0</span></div>
+    </div>
+    <div class="content" id="home-content"></div>
+  </div>
+
+  <!-- ===== COLLECTION ===== -->
+  <div class="screen" id="screen-collection">
+    <div class="topbar">
+      <div class="brand">Коллекция</div>
+      <div class="currency"><span class="icon">💎</span><span id="shard-count-2">0</span></div>
+    </div>
+    <div class="content">
+      <div class="filter-row" id="filter-row"></div>
+      <div class="collection-grid" id="collection-grid"></div>
+    </div>
+  </div>
+
+  <!-- ===== BATTLE SETUP ===== -->
+  <div class="screen" id="screen-battle-setup">
+    <div class="topbar">
+      <div class="brand">Бой</div>
+      <div class="currency"><span class="icon">💎</span><span id="shard-count-3">0</span></div>
+    </div>
+    <div class="content" id="battle-setup-content"></div>
+  </div>
+
+  <!-- ===== TABBAR ===== -->
+  <div class="tabbar" id="tabbar">
+    <button class="tab active" data-tab="home"><span class="ic">🏠</span>Дом</button>
+    <button class="tab" data-tab="collection"><span class="ic">📖</span>Альбом</button>
+    <button class="tab" data-tab="battle"><span class="ic">⚔️</span>Бой</button>
+  </div>
+
+  <!-- ===== PACK OPENING ===== -->
+  <div class="screen" id="screen-pack">
+    <div class="topbar">
+      <button class="btn ghost" id="pack-back-btn" style="width:auto;padding:8px 14px;">← Назад</button>
+      <div class="currency"><span class="icon">💎</span><span id="shard-count-4">0</span></div>
+    </div>
+    <div class="pack-screen" id="pack-intro">
+      <div class="pack-visual" id="pack-visual">🎁</div>
+      <div class="pack-hint">Нажми на пак, чтобы вскрыть</div>
+    </div>
+    <div class="reveal-stage" id="reveal-stage">
+      <div class="reveal-progress" id="reveal-progress">Карта 1 / 5</div>
+      <div class="reveal-card-holder" id="reveal-card-holder"></div>
+      <div class="reveal-new-tag" id="reveal-new-tag"></div>
+      <button class="btn" id="reveal-next-btn" style="width:220px;">Далее</button>
+    </div>
+  </div>
+
+  <!-- ===== BATTLE LOG ===== -->
+  <div class="screen" id="screen-battle-log">
+    <div class="battle-log-screen">
+      <div class="vs-row" id="vs-row"></div>
+      <div class="log-box" id="log-box"></div>
+      <div id="battle-result-holder"></div>
+      <button class="btn" id="battle-log-done-btn" style="display:none;">Забрать награду</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="js/cards.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/pack.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
