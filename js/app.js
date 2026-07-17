@@ -98,6 +98,8 @@ function toast(msg) {
 
 /* ---------------- CARD RENDERING ---------------- */
 
+const ABILITY_ICON = { none: '', shield: '🛡', poison: '☠', heal: '✚', doubleStrike: '⚔⚔', drain: '🩸' };
+
 function buildCardNode(card, opts = {}) {
   const { locked = false, count = null, onClick = null, selected = false } = opts;
   const el = document.createElement('div');
@@ -106,31 +108,86 @@ function buildCardNode(card, opts = {}) {
   if (locked) el.classList.add('locked');
   if (selected) el.classList.add('selected');
 
-  const abilityText = card.ability === 'none' ? '—' : ABILITIES[card.ability].desc(card.value);
+  const hasAbility = card.ability !== 'none';
 
   el.innerHTML = `
-    <div class="card-top">
-      <span class="card-cost">⏳${card.cost}</span>
-      <span class="card-rarity-dot"></span>
+    <div class="card-inner">
+      <div class="card-top">
+        <span class="card-cost">${card.cost}</span>
+        <span class="card-rarity-dot"></span>
+      </div>
+      <div class="card-art">${locked ? '<span class="card-art-locked">✦</span>' : CardArt.render(card)}</div>
+      <div class="card-name-plate"><div class="card-name">${locked ? '???' : card.name}</div></div>
+      <div class="card-ability-line">${locked ? '' : (hasAbility ? `<span class="ab-ic">${ABILITY_ICON[card.ability]}</span> ${ABILITIES[card.ability].label}` : '<span class="ab-none">—</span>')}</div>
+      <div class="card-stats">
+        <span class="atk">${card.attack}</span>
+        <span class="hp">${card.health}</span>
+      </div>
     </div>
-    <div class="card-art">${locked ? '<span class="card-art-locked">❔</span>' : CardArt.render(card)}</div>
-    <div class="card-name">${locked ? '???' : card.name}</div>
-    <div class="card-ability">${locked ? '' : abilityText}</div>
-    <div class="card-stats">
-      <span class="atk">⚔ ${card.attack}</span>
-      <span class="hp">❤ ${card.health}</span>
-    </div>
+    ${!locked ? `<button type="button" class="card-info-btn" aria-label="Подробнее о карте">ⓘ</button>` : ''}
   `;
 
   if (count && count > 1) {
     const badge = document.createElement('div');
     badge.className = 'card-count-badge';
-    badge.textContent = 'x' + count;
+    badge.textContent = '×' + count;
     el.appendChild(badge);
   }
 
   if (onClick) { el.addEventListener('click', onClick); }
+  if (!locked) {
+    const infoBtn = el.querySelector('.card-info-btn');
+    if (infoBtn) {
+      infoBtn.addEventListener('click', (e) => { e.stopPropagation(); openCardModal(card); });
+    }
+    if (!onClick) {
+      el.classList.add('tappable');
+      el.addEventListener('click', () => openCardModal(card));
+    }
+  }
   return el;
+}
+
+/* ---------------- CARD DETAIL MODAL ---------------- */
+
+function openCardModal(card) {
+  const modal = document.getElementById('card-modal');
+  const body = document.getElementById('card-modal-body');
+  const elInfo = ELEMENTS[card.element];
+  const rarity = RARITIES[card.rarity];
+  const owned = ownedCount(card.id);
+  const hasAbility = card.ability !== 'none';
+  const abilityFull = hasAbility ? ABILITIES[card.ability].desc(card.value) : 'Эта карта не обладает особой способностью — полагается на грубую силу в бою.';
+  const lore = CardLore.get(card);
+
+  body.innerHTML = `
+    <div class="modal-art-frame rarity-${card.rarity}">${CardArt.render(card)}</div>
+    <div class="modal-card-name">${card.name}</div>
+    <div class="modal-card-tags">
+      <span class="tag" style="--tc:${elInfo.color}">${elInfo.emoji} ${elInfo.label}</span>
+      <span class="tag" style="--tc:${rarity.color}">${rarity.label}</span>
+    </div>
+    <div class="modal-card-stats">
+      <div class="stat-box"><span class="lbl">Стоимость</span><span class="val">${card.cost}</span></div>
+      <div class="stat-box"><span class="lbl">Атака</span><span class="val atk">${card.attack}</span></div>
+      <div class="stat-box"><span class="lbl">Здоровье</span><span class="val hp">${card.health}</span></div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-title">${hasAbility ? ABILITY_ICON[card.ability] + ' Способность · ' + ABILITIES[card.ability].label : 'Способность'}</div>
+      <div class="modal-body-text">${abilityFull}</div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-title">✦ Летопись</div>
+      <div class="modal-body-text lore">${lore}</div>
+    </div>
+    <div class="modal-owned">${owned > 0 ? `В твоей коллекции: ×${owned}` : 'Эта карта ещё не найдена'}</div>
+  `;
+  modal.classList.add('active');
+  haptic('light');
+}
+
+function closeCardModal() {
+  document.getElementById('card-modal').classList.remove('active');
 }
 
 /* ---------------- HOME ---------------- */
@@ -147,16 +204,16 @@ function renderHome() {
   hero.className = 'panel';
   const uniqueOwned = ownedUniqueCards().length;
   hero.innerHTML = `
-    <div class="hero-title">Привет, коллекционер 👋</div>
-    <p class="hero-sub">У тебя ${uniqueOwned} из ${CARDS.length} карт. Побеждай в боях, зарабатывай кристаллы и вскрывай новые бустеры.</p>
+    <div class="hero-title">Приветствую, Хранитель</div>
+    <p class="hero-sub">В твоём гримуаре ${uniqueOwned} из ${CARDS.length} существ. Побеждай в боях, добывай кристаллы душ и вскрывай новые бустеры, чтобы пополнить свою коллекцию тьмы.</p>
   `;
   el.appendChild(hero);
 
   if (canClaimDaily()) {
     const daily = document.createElement('div');
     daily.className = 'panel';
-    daily.innerHTML = `<div class="hero-title" style="font-size:16px;">🎁 Ежедневный бонус</div>
-      <p class="hero-sub">Забери ${DAILY_BONUS} 💎 просто за то, что зашёл.</p>`;
+    daily.innerHTML = `<div class="hero-title" style="font-size:16px;">✦ Дар подземелья</div>
+      <p class="hero-sub">Забери ${DAILY_BONUS} 💎 просто за то, что вернулся в это мрачное место.</p>`;
     const btn = document.createElement('button');
     btn.className = 'btn';
     btn.textContent = `Забрать ${DAILY_BONUS} 💎`;
@@ -176,8 +233,8 @@ function renderHome() {
   if (state.freeBoosters > 0) {
     const free = document.createElement('div');
     free.className = 'panel';
-    free.innerHTML = `<div class="hero-title" style="font-size:16px;">🎉 Бесплатный бустер</div>
-      <p class="hero-sub">У тебя ${state.freeBoosters} бесплатных бустера(ов). Открой прямо сейчас!</p>`;
+    free.innerHTML = `<div class="hero-title" style="font-size:16px;">🕯 Бесплатный бустер</div>
+      <p class="hero-sub">У тебя ${state.freeBoosters} бесплатных бустера(ов). Вскрой прямо сейчас и узнай, кто прячется внутри.</p>`;
     const btn = document.createElement('button');
     btn.className = 'btn';
     btn.textContent = 'Открыть бесплатно';
@@ -188,7 +245,7 @@ function renderHome() {
 
   const shopTitle = document.createElement('div');
   shopTitle.className = 'section-title';
-  shopTitle.textContent = 'Магазин бустеров';
+  shopTitle.textContent = 'Лавка бустеров';
   el.appendChild(shopTitle);
 
   const shopPanel = document.createElement('div');
@@ -196,10 +253,10 @@ function renderHome() {
   const row = document.createElement('div');
   row.className = 'pack-shop-item';
   row.innerHTML = `
-    <div class="pack-icon">🎁</div>
+    <div class="pack-icon">📜</div>
     <div class="pack-info">
-      <div class="name">Стандартный бустер</div>
-      <div class="desc">5 карт · шанс на редкие и легендарные</div>
+      <div class="name">Тёмный бустер</div>
+      <div class="desc">5 карт · шанс на редких и легендарных существ</div>
     </div>
   `;
   const buyBtn = document.createElement('button');
@@ -213,11 +270,11 @@ function renderHome() {
 
   const statsTitle = document.createElement('div');
   statsTitle.className = 'section-title';
-  statsTitle.textContent = 'Статистика';
+  statsTitle.textContent = 'Хроника побед';
   el.appendChild(statsTitle);
   const statsPanel = document.createElement('div');
   statsPanel.className = 'panel';
-  statsPanel.innerHTML = `<p class="hero-sub" style="margin:0;">🏆 Побед: ${state.wins} &nbsp;·&nbsp; ☠️ Поражений: ${state.losses}</p>`;
+  statsPanel.innerHTML = `<p class="hero-sub" style="margin:0;">🏆 Побед: ${state.wins} &nbsp;·&nbsp; 💀 Поражений: ${state.losses}</p>`;
   el.appendChild(statsPanel);
 }
 
@@ -353,7 +410,7 @@ function renderBattleSetup() {
   tierPanel.innerHTML = `<div class="hero-title" style="font-size:16px;">Выбери соперника</div>`;
   const tierRow = document.createElement('div');
   tierRow.className = 'tier-row';
-  [[1, 'Новичок'], [2, 'Ветеран'], [3, 'Мастер']].forEach(([t, label]) => {
+  [[1, 'Бродяга'], [2, 'Клинок Ночи'], [3, 'Владыка Арены']].forEach(([t, label]) => {
     const btn = document.createElement('button');
     btn.className = 'tier-btn' + (currentTier === t ? ' active' : '');
     const unlocked = tierUnlocked(t);
@@ -367,7 +424,7 @@ function renderBattleSetup() {
 
   const deckPanel = document.createElement('div');
   deckPanel.className = 'panel';
-  deckPanel.innerHTML = `<div class="hero-title" style="font-size:16px;">Твой отряд (порядок важен!)</div>
+  deckPanel.innerHTML = `<div class="hero-title" style="font-size:16px;">Твой отряд теней (порядок важен!)</div>
     <p class="hero-sub">Первая карта встретит соперника первой. Победивший остаётся на поле с текущим здоровьем.</p>`;
   const slotsRow = document.createElement('div');
   slotsRow.className = 'deck-slots';
@@ -515,10 +572,19 @@ function bindStaticEvents() {
 
   if (tg && tg.BackButton) {
     tg.BackButton.onClick(() => {
+      if (document.getElementById('card-modal').classList.contains('active')) {
+        closeCardModal();
+        return;
+      }
       showScreen('screen-home');
       renderHome();
     });
   }
+
+  document.getElementById('card-modal-close').addEventListener('click', closeCardModal);
+  document.getElementById('card-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'card-modal') closeCardModal();
+  });
 }
 
 async function init() {
