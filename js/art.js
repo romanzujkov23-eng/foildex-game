@@ -1,18 +1,26 @@
 /* ==========================================================
-   ART.JS — генерация карточных иллюстраций (тёмное фэнтези)
-   Никаких внешних картинок: всё рисуется кодом в SVG, поэтому
-   не зависит от хостинга и не нарушает чужие авторские права —
-   при этом каждая карта получает своё, непохожее на другие,
-   "существо" (силуэт + черты + элементальные эффекты + аура
-   редкости), детерминированно сгенерированное из её id, так что
-   у одной и той же карты арт всегда одинаковый между сессиями.
+   ART.JS — иллюстрации карт (тёмное фэнтези)
+
+   Основной режим: настоящее растровое изображение существа
+   (WebP/JPG), лежащее в assets/cards/<id>.webp (+ .jpg как
+   запасной формат). Если файл для карты ещё не залит —
+   автоматически (через onerror у <img>) откатываемся на старый
+   процедурный SVG-генератор, чтобы карта не показывала "битую
+   картинку", пока вы постепенно грузите арты.
+
+   Как добавить реальный арт карте:
+   1) Сгенерируйте/подготовьте квадратное изображение (см. промпты
+      в CARD_ART_PROMPTS.md)
+   2) Сохраните как assets/cards/<id>.webp (и/или .jpg)
+      Пример: assets/cards/f01.webp — для карты "Тлеющий Щенок"
+   3) Ничего в коде менять не нужно — при следующей отрисовке
+      игра сама подхватит файл вместо SVG.
 
    Структура:
-   - seeded RNG (мультиберри32) от id карты → стабильная "случайность"
-   - 6 архетипов силуэтов (beast/bird/serpent/insect/spirit/guardian),
-     каждый — гравюра-образ существа, не абстрактная эмблема
-   - элементальные эффекты (огонь/вода/природа/молния/тень/свет)
-   - рамка ауры редкости (common → legendary)
+   - render(card)            → <picture> c реальным изображением
+                                 + автоматический откат на SVG
+   - renderProcedural(card)  → старый процедурный SVG-арт
+   - CardArt.fallback(id, el)→ вызывается по onerror у <img>
    ========================================================== */
 
 const CardArt = (() => {
@@ -300,7 +308,7 @@ const CardArt = (() => {
     `;
   }
 
-  function render(card) {
+  function renderProcedural(card) {
     const el = ELEMENTS[card.element];
     const rarity = RARITIES[card.rarity];
     const rng = makeRng(card.id + ':' + card.name);
@@ -338,5 +346,39 @@ const CardArt = (() => {
     `;
   }
 
-  return { render };
+  /* ---------- путь к папке с реальными изображениями ---------- */
+  // Меняйте только эту константу, если решите переименовать/перенести папку.
+  const ART_BASE = 'assets/cards/';
+
+  /* Вызывается из onerror <img>, когда файла ещё нет / не загрузился.
+     Подменяет саму картинку на процедурный SVG-арт этой же карты. */
+  function fallback(id, imgEl) {
+    const card = CARD_BY_ID[id];
+    if (!card) return;
+    const holder = imgEl.closest('.card-art, .modal-art-frame');
+    if (holder) holder.innerHTML = renderProcedural(card);
+  }
+
+  /* Основной рендер: пытаемся показать реальное изображение,
+     с автоматическим откатом на процедурный арт при отсутствии файла. */
+  function render(card) {
+    const el = ELEMENTS[card.element];
+    const webp = ART_BASE + card.id + '.webp';
+    const jpg = ART_BASE + card.id + '.jpg';
+    return `
+      <picture>
+        <source srcset="${webp}" type="image/webp">
+        <img
+          class="card-art-img"
+          src="${jpg}"
+          alt="${card.name}, ${el.label}"
+          loading="lazy"
+          decoding="async"
+          onerror="CardArt.fallback('${card.id}', this)"
+        >
+      </picture>
+    `;
+  }
+
+  return { render, renderProcedural, fallback };
 })();
