@@ -195,7 +195,6 @@ function openCardModal(card) {
   const owned = ownedCount(card.id);
   const hasAbility = card.ability !== 'none';
   const abilityFull = hasAbility ? ABILITIES[card.ability].desc(card.value) : 'Эта карта не обладает особой способностью — полагается на грубую силу в бою.';
-  const lore = CardLore.get(card);
 
   body.innerHTML = `
     <div class="modal-art-frame rarity-${card.rarity}">${CardArt.render(card)}</div>
@@ -212,10 +211,6 @@ function openCardModal(card) {
     <div class="modal-section">
       <div class="modal-section-title">${hasAbility ? ABILITY_ICON[card.ability] + ' Способность · ' + ABILITIES[card.ability].label : 'Способность'}</div>
       <div class="modal-body-text">${abilityFull}</div>
-    </div>
-    <div class="modal-section">
-      <div class="modal-section-title">✦ Летопись</div>
-      <div class="modal-body-text lore">${lore}</div>
     </div>
     <div class="modal-owned">${owned > 0 ? `В твоей коллекции: ×${owned}` : 'Эта карта ещё не найдена'}</div>
   `;
@@ -237,47 +232,78 @@ function renderHome() {
   const el = document.getElementById('home-content');
   el.innerHTML = '';
 
-  const hero = document.createElement('div');
-  hero.className = 'panel';
   const uniqueOwned = ownedUniqueCards().length;
-  hero.innerHTML = `
-    <div class="hero-title">Приветствую, Хранитель</div>
-    <p class="hero-sub">В твоём гримуаре ${uniqueOwned} из ${CARDS.length} существ. Побеждай в боях, добывай кристаллы душ и вскрывай новые бустеры, чтобы пополнить свою коллекцию тьмы.</p>
+
+  /* ---- обложка-постер (магазинный/журнальный вид) ---- */
+  const coverCard = CARD_BY_ID['n07']; // Мировой Корень — легендарный лик логова
+  const cover = document.createElement('div');
+  cover.className = 'home-cover';
+  cover.innerHTML = `
+    <picture>
+      <source srcset="assets/cards/${coverCard.id}.webp" type="image/webp">
+      <img src="assets/cards/${coverCard.id}.jpg" alt="${coverCard.name}" loading="eager">
+    </picture>
+    <div class="home-cover-content">
+      <div class="home-cover-eyebrow">
+        <span>✦ Тёмный Гримуар</span>
+        <span>№1</span>
+      </div>
+      <div>
+        <div class="home-cover-badge">📖 ${uniqueOwned} / ${CARDS.length} существ поймано</div>
+        <div class="home-cover-title">ЛОГОВО<br>ТЕНЕЙ</div>
+        <p class="home-cover-sub">Побеждай в боях, собирай кристаллы душ и вскрывай бустеры — гримуар ждёт, чтобы его заполнили.</p>
+      </div>
+    </div>
   `;
-  el.appendChild(hero);
+  el.appendChild(cover);
 
-  if (canClaimDaily()) {
-    const daily = document.createElement('div');
-    daily.className = 'panel';
-    daily.innerHTML = `<div class="hero-title" style="font-size:16px;">✦ Дар подземелья</div>
-      <p class="hero-sub">Забери ${DAILY_BONUS} ${COIN_ICON} просто за то, что вернулся в это мрачное место.</p>`;
-    const btn = document.createElement('button');
-    btn.className = 'btn';
-    btn.innerHTML = `Забрать ${DAILY_BONUS} ${COIN_ICON}`;
-    btn.onclick = async () => {
-      state.shards += DAILY_BONUS;
-      state.lastDaily = Date.now();
-      await saveState();
-      haptic('success');
-      SoundSystem.coin();
-      toast(`+${DAILY_BONUS} ${COIN_ICON}`);
-      renderHome();
-    };
-    daily.appendChild(btn);
-    el.appendChild(daily);
-  }
+  /* ---- быстрые действия: дар дня + бесплатный бустер ---- */
+  const hasDaily = canClaimDaily();
+  const hasFree = state.freeBoosters > 0;
+  if (hasDaily || hasFree) {
+    const quick = document.createElement('div');
+    quick.className = 'quick-actions';
 
-  if (state.freeBoosters > 0) {
-    const free = document.createElement('div');
-    free.className = 'panel';
-    free.innerHTML = `<div class="hero-title" style="font-size:16px;">🕯 Бесплатный бустер</div>
-      <p class="hero-sub">У тебя ${state.freeBoosters} бесплатных бустера(ов). Вскрой прямо сейчас и узнай, кто прячется внутри.</p>`;
-    const btn = document.createElement('button');
-    btn.className = 'btn';
-    btn.textContent = 'Открыть бесплатно';
-    btn.onclick = () => { SoundSystem.tap(); startPackFlow({ free: true }); };
-    free.appendChild(btn);
-    el.appendChild(free);
+    if (hasDaily) {
+      const card = document.createElement('div');
+      card.className = 'quick-card';
+      card.innerHTML = `
+        <div class="qc-icon">✦</div>
+        <div class="qc-title">Дар подземелья</div>
+        <div class="qc-desc">Забери просто за то, что вернулся.</div>
+      `;
+      const btn = document.createElement('button');
+      btn.className = 'btn';
+      btn.innerHTML = `+${DAILY_BONUS} ${COIN_ICON}`;
+      btn.onclick = async () => {
+        state.shards += DAILY_BONUS;
+        state.lastDaily = Date.now();
+        await saveState();
+        haptic('success');
+        SoundSystem.coin();
+        toast(`+${DAILY_BONUS} ${COIN_ICON}`);
+        renderHome();
+      };
+      card.appendChild(btn);
+      quick.appendChild(card);
+    }
+
+    if (hasFree) {
+      const card = document.createElement('div');
+      card.className = 'quick-card';
+      card.innerHTML = `
+        <div class="qc-icon">🕯</div>
+        <div class="qc-title">Бесплатный бустер</div>
+        <div class="qc-desc">Доступно: ${state.freeBoosters} шт.</div>
+      `;
+      const btn = document.createElement('button');
+      btn.className = 'btn';
+      btn.textContent = 'Открыть';
+      btn.onclick = () => { SoundSystem.tap(); startPackFlow({ free: true }); };
+      card.appendChild(btn);
+      quick.appendChild(card);
+    }
+    el.appendChild(quick);
   }
 
   const shopTitle = document.createElement('div');
@@ -470,8 +496,7 @@ function renderBattleSetup() {
     slot.className = 'deck-slot' + (cardId ? ' filled' : '');
     if (cardId) {
       const card = CARD_BY_ID[cardId];
-      const node = buildCardNode(card);
-      node.onclick = () => { deckSlots[idx] = null; renderBattleSetup(); };
+      const node = buildCardNode(card, { onClick: () => { deckSlots[idx] = null; renderBattleSetup(); } });
       slot.appendChild(node);
     } else {
       slot.textContent = (idx + 1).toString();
@@ -500,14 +525,17 @@ function renderBattleSetup() {
   const rarityRank = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
   owned.sort((a, b) => rarityRank[b.rarity] - rarityRank[a.rarity]).forEach(card => {
     const isSelected = deckSlots.includes(card.id);
-    const node = buildCardNode(card, { count: ownedCount(card.id), selected: isSelected });
-    node.onclick = () => {
-      if (isSelected) return;
-      const emptyIdx = deckSlots.indexOf(null);
-      if (emptyIdx === -1) return;
-      deckSlots[emptyIdx] = card.id;
-      renderBattleSetup();
-    };
+    const node = buildCardNode(card, {
+      count: ownedCount(card.id),
+      selected: isSelected,
+      onClick: () => {
+        if (isSelected) return;
+        const emptyIdx = deckSlots.indexOf(null);
+        if (emptyIdx === -1) return;
+        deckSlots[emptyIdx] = card.id;
+        renderBattleSetup();
+      },
+    });
     pickGrid.appendChild(node);
   });
   el.appendChild(pickGrid);
