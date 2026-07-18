@@ -7,6 +7,22 @@ const BOOSTER_COST = 100;
 const DAILY_BONUS = 50;
 const DAILY_COOLDOWN_MS = 20 * 60 * 60 * 1000; // 20 часов
 
+/* Кастомная иконка валюты — мешок с золотом (вместо эмодзи 💎) */
+const COIN_ICON = `<svg class="coin-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="coinBagGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f6d488"/>
+      <stop offset="55%" stop-color="#e8b64a"/>
+      <stop offset="100%" stop-color="#a9761f"/>
+    </linearGradient>
+  </defs>
+  <path d="M9.3 5.2c0-1.7 1.1-3 2.7-3s2.7 1.3 2.7 3" fill="none" stroke="#8a6423" stroke-width="1.3" stroke-linecap="round"/>
+  <path d="M7 6.1c-2.9 2.9-4 6.9-2.6 10.3C5.7 19.9 8.5 21.6 12 21.6s6.3-1.7 7.6-5.2C20.9 12.9 20 8.9 17 6.1c-1.6 0.95-3.2 1.35-5 1.35S8.6 7.05 7 6.1z" fill="url(#coinBagGrad)" stroke="#8a6423" stroke-width="0.7"/>
+  <path d="M7.3 8.9c2.8 1.4 6.6 1.4 9.4 0" fill="none" stroke="#8a6423" stroke-width="0.6" opacity="0.55"/>
+  <circle cx="12" cy="14.6" r="2.6" fill="#fff3d6" opacity="0.3"/>
+  <circle cx="12" cy="14.6" r="2.1" fill="none" stroke="#8a6423" stroke-width="0.7"/>
+</svg>`;
+
 let state = null;
 let currentTier = 1;
 let deckSlots = [null, null, null, null, null];
@@ -91,7 +107,7 @@ function toast(msg) {
   const root = document.getElementById('toast-root');
   const el = document.createElement('div');
   el.className = 'toast';
-  el.textContent = msg;
+  el.innerHTML = msg;
   root.appendChild(el);
   setTimeout(() => el.remove(), 2400);
 }
@@ -101,31 +117,52 @@ function toast(msg) {
 const ABILITY_ICON = { none: '', shield: '🛡', poison: '☠', heal: '✚', doubleStrike: '⚔⚔', drain: '🩸' };
 
 function buildCardNode(card, opts = {}) {
-  const { locked = false, count = null, onClick = null, selected = false } = opts;
+  const { locked = false, count = null, onClick = null, selected = false, variant = 'mini' } = opts;
   const el = document.createElement('div');
-  el.className = `card rarity-${card.rarity}`;
+  el.className = `card card--${variant} rarity-${card.rarity}`;
   if (['epic', 'legendary'].includes(card.rarity) && !locked) el.classList.add('holo');
   if (locked) el.classList.add('locked');
   if (selected) el.classList.add('selected');
 
   const hasAbility = card.ability !== 'none';
+  const artHtml = locked ? '<span class="card-art-locked">✦</span>' : CardArt.render(card);
 
-  el.innerHTML = `
-    <div class="card-inner">
+  if (variant === 'full') {
+    el.innerHTML = `
+      <div class="card-inner">
+        <div class="card-top">
+          <span class="card-cost">${card.cost}</span>
+          <span class="card-rarity-dot"></span>
+        </div>
+        <div class="card-art">${artHtml}</div>
+        <div class="card-name-plate"><div class="card-name">${locked ? '???' : card.name}</div></div>
+        <div class="card-ability-line">${locked ? '' : (hasAbility ? `<span class="ab-ic">${ABILITY_ICON[card.ability]}</span> ${ABILITIES[card.ability].label}` : '<span class="ab-none">—</span>')}</div>
+        <div class="card-stats">
+          <span class="atk">${card.attack}</span>
+          <span class="hp">${card.health}</span>
+        </div>
+      </div>
+      ${!locked ? `<button type="button" class="card-info-btn" aria-label="Подробнее о карте">ⓘ</button>` : ''}
+    `;
+  } else {
+    /* mini: арт занимает всю карту, имя и статы — единой плашкой снизу */
+    el.innerHTML = `
+      <div class="card-art">${artHtml}</div>
       <div class="card-top">
         <span class="card-cost">${card.cost}</span>
-        <span class="card-rarity-dot"></span>
       </div>
-      <div class="card-art">${locked ? '<span class="card-art-locked">✦</span>' : CardArt.render(card)}</div>
-      <div class="card-name-plate"><div class="card-name">${locked ? '???' : card.name}</div></div>
-      <div class="card-ability-line">${locked ? '' : (hasAbility ? `<span class="ab-ic">${ABILITY_ICON[card.ability]}</span> ${ABILITIES[card.ability].label}` : '<span class="ab-none">—</span>')}</div>
-      <div class="card-stats">
-        <span class="atk">${card.attack}</span>
-        <span class="hp">${card.health}</span>
-      </div>
-    </div>
-    ${!locked ? `<button type="button" class="card-info-btn" aria-label="Подробнее о карте">ⓘ</button>` : ''}
-  `;
+      ${!locked ? `
+        <div class="card-scrim">
+          <div class="card-name">${card.name}</div>
+          <div class="card-stats">
+            <span class="atk">${card.attack}</span>
+            <span class="hp">${card.health}</span>
+          </div>
+        </div>
+        <button type="button" class="card-info-btn" aria-label="Подробнее о карте">ⓘ</button>
+      ` : ''}
+    `;
+  }
 
   if (count && count > 1) {
     const badge = document.createElement('div');
@@ -213,17 +250,17 @@ function renderHome() {
     const daily = document.createElement('div');
     daily.className = 'panel';
     daily.innerHTML = `<div class="hero-title" style="font-size:16px;">✦ Дар подземелья</div>
-      <p class="hero-sub">Забери ${DAILY_BONUS} 💎 просто за то, что вернулся в это мрачное место.</p>`;
+      <p class="hero-sub">Забери ${DAILY_BONUS} ${COIN_ICON} просто за то, что вернулся в это мрачное место.</p>`;
     const btn = document.createElement('button');
     btn.className = 'btn';
-    btn.textContent = `Забрать ${DAILY_BONUS} 💎`;
+    btn.innerHTML = `Забрать ${DAILY_BONUS} ${COIN_ICON}`;
     btn.onclick = async () => {
       state.shards += DAILY_BONUS;
       state.lastDaily = Date.now();
       await saveState();
       haptic('success');
       SoundSystem.coin();
-      toast(`+${DAILY_BONUS} 💎`);
+      toast(`+${DAILY_BONUS} ${COIN_ICON}`);
       renderHome();
     };
     daily.appendChild(btn);
@@ -261,7 +298,7 @@ function renderHome() {
   `;
   const buyBtn = document.createElement('button');
   buyBtn.className = 'pack-buy';
-  buyBtn.textContent = `${BOOSTER_COST} 💎`;
+  buyBtn.innerHTML = `${BOOSTER_COST} ${COIN_ICON}`;
   buyBtn.disabled = state.shards < BOOSTER_COST;
   buyBtn.onclick = () => { SoundSystem.tap(); startPackFlow({ free: false }); };
   row.appendChild(buyBtn);
@@ -355,7 +392,7 @@ function showRevealCard() {
   const card = pendingCards[revealIndex];
   const holder = document.getElementById('reveal-card-holder');
   holder.innerHTML = '';
-  const node = buildCardNode(card);
+  const node = buildCardNode(card, { variant: 'full' });
   node.classList.add('reveal-flip-anim');
   holder.appendChild(node);
 
@@ -522,7 +559,7 @@ async function finishBattle(result) {
   const label = result.playerWon ? 'Победа!' : (result.draw ? 'Ничья' : 'Поражение');
   const cls = result.playerWon ? 'win' : (result.draw ? 'draw' : 'lose');
   holder.innerHTML = `<div class="battle-result ${cls}">${label}</div>
-    <p class="hero-sub" style="text-align:center;">+${reward} 💎</p>`;
+    <p class="hero-sub" style="text-align:center;">+${reward} ${COIN_ICON}</p>`;
 
   const doneBtn = document.getElementById('battle-log-done-btn');
   doneBtn.style.display = 'block';
