@@ -47,6 +47,9 @@ function defaultState() {
     freeBoosters: 2,
     collection: {},
     pity: 0,
+    epicPity: 0,
+    legendaryPity: 0,
+    mythicPity: 0,
     wins: 0,
     losses: 0,
     lastDaily: 0,
@@ -62,6 +65,10 @@ async function loadState() {
     state = defaultState();
   }
   if (state.soundOn === undefined) state.soundOn = true;
+  // Миграция старых сохранений — досоздаём новые pity-счётчики, если их ещё нет
+  if (state.epicPity === undefined) state.epicPity = 0;
+  if (state.legendaryPity === undefined) state.legendaryPity = 0;
+  if (state.mythicPity === undefined) state.mythicPity = 0;
   SoundSystem.setEnabled(state.soundOn);
 }
 
@@ -115,24 +122,30 @@ function toast(msg) {
 /* ---------------- CARD RENDERING ---------------- */
 
 const ABILITY_ICON = { none: '', shield: '🛡', poison: '☠', heal: '✚', doubleStrike: '⚔⚔', drain: '🩸' };
+const RARITY_ICON = { common: '●', uncommon: '◆', rare: '★', epic: '✦✦', legendary: '♛', mythic: '✵' };
 
 function buildCardNode(card, opts = {}) {
   const { locked = false, count = null, onClick = null, selected = false, variant = 'mini' } = opts;
   const el = document.createElement('div');
   el.className = `card card--${variant} rarity-${card.rarity}`;
-  if (['epic', 'legendary'].includes(card.rarity) && !locked) el.classList.add('holo');
+  if (STANDOUT_RARITIES.includes(card.rarity) && !locked) el.classList.add('holo');
+  if (card.rarity === 'mythic' && !locked) el.classList.add('mythic-fx');
   if (locked) el.classList.add('locked');
   if (selected) el.classList.add('selected');
 
   const hasAbility = card.ability !== 'none';
   const artHtml = locked ? '<span class="card-art-locked">✦</span>' : CardArt.render(card);
+  const elInfo = ELEMENTS[card.element];
+  const rarityBadge = `<span class="card-rarity-badge" style="--tc:${RARITIES[card.rarity].color}"><span class="ric">${RARITY_ICON[card.rarity]}</span></span>`;
+  const elementBadge = `<span class="card-element-badge" style="--tc:${elInfo.color}">${elInfo.emoji}</span>`;
 
   if (variant === 'full') {
     el.innerHTML = `
       <div class="card-inner">
         <div class="card-top">
           <span class="card-cost">${card.cost}</span>
-          <span class="card-rarity-dot"></span>
+          ${elementBadge}
+          ${rarityBadge}
         </div>
         <div class="card-art">${artHtml}</div>
         <div class="card-name-plate"><div class="card-name">${locked ? '???' : card.name}</div></div>
@@ -150,6 +163,8 @@ function buildCardNode(card, opts = {}) {
       <div class="card-art">${artHtml}</div>
       <div class="card-top">
         <span class="card-cost">${card.cost}</span>
+        ${!locked ? elementBadge : ''}
+        ${!locked ? rarityBadge : ''}
       </div>
       ${!locked ? `
         <div class="card-scrim">
@@ -319,7 +334,7 @@ function renderHome() {
     <div class="pack-icon">📜</div>
     <div class="pack-info">
       <div class="name">Тёмный бустер</div>
-      <div class="desc">5 карт · шанс на редких и легендарных существ</div>
+      <div class="desc">5 карт · шанс на мифическую и «везучий» бустер ✵</div>
     </div>
   `;
   const buyBtn = document.createElement('button');
@@ -358,7 +373,7 @@ function renderCollection() {
     filterRow.appendChild(chip);
   });
 
-  const rarityRank = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
+  const rarityRank = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, mythic: 5 };
   const list = CARDS
     .filter(c => collectionFilter === 'all' || c.element === collectionFilter)
     .sort((a, b) => rarityRank[a.rarity] - rarityRank[b.rarity]);
@@ -373,8 +388,20 @@ function renderCollection() {
 /* ---------------- PACK OPENING ---------------- */
 
 let pendingCards = [];
+let pendingIsLucky = false;
 let revealIndex = 0;
 let pendingPaymentDone = false;
+
+function renderPityPanel() {
+  const panel = document.getElementById('pity-panel');
+  if (!panel) return;
+  const status = PackSystem.pityStatus(state);
+  panel.innerHTML = `
+    <div class="pity-row"><span class="pity-ic" style="--tc:${RARITIES.rare.color}">★</span>До гарантии Редкой+: <b>${status.rare}</b></div>
+    <div class="pity-row"><span class="pity-ic" style="--tc:${RARITIES.legendary.color}">♛</span>До гарантии Легендарной+: <b>${status.legendary}</b></div>
+    <div class="pity-row"><span class="pity-ic" style="--tc:${RARITIES.mythic.color}">✵</span>До гарантии Мифической: <b>${status.mythic}</b></div>
+  `;
+}
 
 function startPackFlow({ free }) {
   if (free) {
@@ -386,9 +413,11 @@ function startPackFlow({ free }) {
   showScreen('screen-pack');
   document.getElementById('pack-intro').style.display = 'flex';
   document.getElementById('reveal-stage').classList.remove('active');
+  document.getElementById('lucky-banner').classList.remove('show');
   const visual = document.getElementById('pack-visual');
   visual.classList.remove('opening');
   visual.onclick = () => openPack({ free });
+  renderPityPanel();
 }
 
 async function openPack({ free }) {
@@ -402,13 +431,22 @@ async function openPack({ free }) {
 
   if (free) { state.freeBoosters -= 1; } else { state.shards -= BOOSTER_COST; }
 
-  pendingCards = PackSystem.openBooster(state);
+  const result = PackSystem.openBooster(state);
+  pendingCards = result.cards;
+  pendingIsLucky = result.isLucky;
   await saveState();
   syncShardDisplays();
 
   setTimeout(() => {
     document.getElementById('pack-intro').style.display = 'none';
     document.getElementById('reveal-stage').classList.add('active');
+    if (pendingIsLucky) {
+      const banner = document.getElementById('lucky-banner');
+      banner.classList.add('show');
+      haptic('success');
+      SoundSystem.reveal('mythic');
+      setTimeout(() => banner.classList.remove('show'), 2200);
+    }
     revealIndex = 0;
     showRevealCard();
   }, 550);
@@ -427,7 +465,15 @@ function showRevealCard() {
   const wasOwned = ownedCount(card.id) > 0;
   document.getElementById('reveal-new-tag').textContent = wasOwned ? '' : '✨ НОВАЯ КАРТА';
 
-  const rarityHaptic = { common: 'light', uncommon: 'medium', rare: 'heavy', epic: 'success', legendary: 'success' };
+  const flash = document.getElementById('reveal-flash');
+  flash.className = 'reveal-flash';
+  if (STANDOUT_RARITIES.includes(card.rarity)) {
+    // форс-рефлоу, чтобы анимация могла перезапуститься на повторной редкости подряд
+    void flash.offsetWidth;
+    flash.classList.add('flash-' + card.rarity, 'flash-play');
+  }
+
+  const rarityHaptic = { common: 'light', uncommon: 'medium', rare: 'heavy', epic: 'success', legendary: 'success', mythic: 'success' };
   haptic(rarityHaptic[card.rarity] || 'light');
   SoundSystem.reveal(card.rarity);
 
@@ -438,8 +484,10 @@ function showRevealCard() {
 async function finishReveal() {
   addCardsToCollection(pendingCards);
   await saveState();
-  const rareCount = pendingCards.filter(c => ['rare', 'epic', 'legendary'].includes(c.rarity)).length;
-  toast(rareCount > 0 ? `Получено 5 карт, из них ${rareCount} редких+!` : 'Получено 5 карт!');
+  const rareCount = pendingCards.filter(c => ['rare', 'epic', 'legendary', 'mythic'].includes(c.rarity)).length;
+  const hasMythic = pendingCards.some(c => c.rarity === 'mythic');
+  if (hasMythic) toast('✵ МИФИЧЕСКАЯ КАРТА! Получено 5 карт!');
+  else toast(rareCount > 0 ? `Получено 5 карт, из них ${rareCount} редких+!` : 'Получено 5 карт!');
   showScreen('screen-home');
   renderHome();
 }
@@ -522,7 +570,7 @@ function renderBattleSetup() {
 
   const pickGrid = document.createElement('div');
   pickGrid.className = 'pick-grid';
-  const rarityRank = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
+  const rarityRank = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, mythic: 5 };
   owned.sort((a, b) => rarityRank[b.rarity] - rarityRank[a.rarity]).forEach(card => {
     const isSelected = deckSlots.includes(card.id);
     const node = buildCardNode(card, {

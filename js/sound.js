@@ -92,6 +92,11 @@ const SoundSystem = (() => {
       [392, 523, 659, 784, 1046, 1318].forEach((f, i) => tone({ freq: f, start: i * 0.06, dur: 0.35, type: 'sine', peak: 0.18 }));
       tone({ freq: 196, dur: 0.6, type: 'sine', peak: 0.15 });
       noiseBurst({ start: 0, dur: 0.8, peak: 0.1, filterFreq: 5000 });
+    } else if (rarity === 'mythic') {
+      [261, 392, 523, 659, 784, 1046, 1318, 1568].forEach((f, i) => tone({ freq: f, start: i * 0.055, dur: 0.4, type: 'sine', peak: 0.19 }));
+      tone({ freq: 130, dur: 0.9, type: 'sine', peak: 0.17 });
+      tone({ freq: 98, start: 0.1, dur: 1.0, type: 'triangle', peak: 0.12 });
+      noiseBurst({ start: 0, dur: 1.1, peak: 0.12, filterFreq: 6000 });
     }
   }
 

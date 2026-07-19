@@ -293,16 +293,48 @@ const CardArt = (() => {
         </g>
       `;
     }
-    // legendary
+    if (rarity === 'legendary') {
+      return `
+        <circle cx="50" cy="50" r="47" fill="none" stroke="${rc}" stroke-width="1.2" opacity="0.85"/>
+        <circle cx="50" cy="50" r="43" fill="none" stroke="${rc}" stroke-width="0.6" stroke-dasharray="1 2" opacity="0.55"/>
+        <path d="M38,10 L44,3 L50,9 L56,3 L62,10 L50,14 Z" fill="${rc}" opacity="0.9"/>
+        <g opacity="0.9">
+          ${[45,135,225,315].map(a => {
+            const r = a * Math.PI / 180;
+            const x = 50 + Math.cos(r) * 44, y = 50 + Math.sin(r) * 44;
+            return `<path d="M${x},${y - 2} L${x + 2},${y} L${x},${y + 2} L${x - 2},${y} Z" fill="${rc}"/>`;
+          }).join('')}
+        </g>
+      `;
+    }
+    // mythic — прizматическая, самая пышная аура: двойное кольцо + корона лучей + искры
+    const prismId = 'prism_' + Math.random().toString(36).slice(2, 8);
     return `
-      <circle cx="50" cy="50" r="47" fill="none" stroke="${rc}" stroke-width="1.2" opacity="0.85"/>
-      <circle cx="50" cy="50" r="43" fill="none" stroke="${rc}" stroke-width="0.6" stroke-dasharray="1 2" opacity="0.55"/>
-      <path d="M38,10 L44,3 L50,9 L56,3 L62,10 L50,14 Z" fill="${rc}" opacity="0.9"/>
+      <defs>
+        <linearGradient id="${prismId}" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ff3d7a"/>
+          <stop offset="30%" stop-color="#ffb238"/>
+          <stop offset="55%" stop-color="#4fd8c8"/>
+          <stop offset="80%" stop-color="#9b6bff"/>
+          <stop offset="100%" stop-color="#ff3d7a"/>
+        </linearGradient>
+      </defs>
+      <circle cx="50" cy="50" r="47.5" fill="none" stroke="url(#${prismId})" stroke-width="2" opacity="0.95"/>
+      <circle cx="50" cy="50" r="43" fill="none" stroke="url(#${prismId})" stroke-width="0.8" stroke-dasharray="1 2" opacity="0.6"/>
+      <g opacity="0.95">
+        ${[0,60,120,180,240,300].map(a => {
+          const r = a * Math.PI / 180;
+          const x1 = 50 + Math.cos(r) * 46, y1 = 50 + Math.sin(r) * 46;
+          const x2 = 50 + Math.cos(r) * 40, y2 = 50 + Math.sin(r) * 40;
+          return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="url(#${prismId})" stroke-width="1.4"/>`;
+        }).join('')}
+      </g>
+      <path d="M50,8 L57,2 L50,-4 L43,2 Z" fill="url(#${prismId})" opacity="0.95" transform="translate(0,4)"/>
       <g opacity="0.9">
-        ${[45,135,225,315].map(a => {
+        ${[20,80,160,220,290,340].map(a => {
           const r = a * Math.PI / 180;
           const x = 50 + Math.cos(r) * 44, y = 50 + Math.sin(r) * 44;
-          return `<path d="M${x},${y - 2} L${x + 2},${y} L${x},${y + 2} L${x - 2},${y} Z" fill="${rc}"/>`;
+          return `<circle cx="${x}" cy="${y}" r="1.3" fill="url(#${prismId})"/>`;
         }).join('')}
       </g>
     `;
@@ -313,11 +345,16 @@ const CardArt = (() => {
     const rarity = RARITIES[card.rarity];
     const rng = makeRng(card.id + ':' + card.name);
     const base = el.color;
-    const light = shade(base, 45);
-    const dark = shade(base, -70);
+    const light = shade(base, 58);
+    const dark = shade(base, -65);
     const glow = pick(rng, ['#fff', '#ffe9b0', light]);
     const gradId = 'grad_' + card.id;
     const vignetteId = 'vig_' + card.id;
+    const standout = STANDOUT_RARITIES.includes(card.rarity);
+    // редкие карты получают более яркий, насыщенный фон вместо тёмной пустоты —
+    // ближе к глянцевым коллекционным карточкам, а не мрачному силуэту
+    const bgInner = standout ? alpha(rarity.color, 0.4) : alpha(base, 0.28);
+    const bgMid = standout ? alpha(rarity.color, 0.18) : 'rgba(6,7,12,0.55)';
 
     const shapeFn = SHAPES[card.shape] || SHAPES.spirit;
     const creature = shapeFn(rng, base, dark, glow);
@@ -329,12 +366,12 @@ const CardArt = (() => {
         <defs>
           <radialGradient id="${gradId}" cx="42%" cy="30%" r="75%">
             <stop offset="0%" stop-color="${light}"/>
-            <stop offset="55%" stop-color="${base}"/>
+            <stop offset="50%" stop-color="${base}"/>
             <stop offset="100%" stop-color="${dark}"/>
           </radialGradient>
-          <radialGradient id="${vignetteId}" cx="50%" cy="42%" r="65%">
-            <stop offset="0%" stop-color="${alpha(base, 0.28)}"/>
-            <stop offset="70%" stop-color="rgba(6,7,12,0.55)"/>
+          <radialGradient id="${vignetteId}" cx="50%" cy="42%" r="68%">
+            <stop offset="0%" stop-color="${bgInner}"/>
+            <stop offset="65%" stop-color="${bgMid}"/>
             <stop offset="100%" stop-color="rgba(2,2,5,0.92)"/>
           </radialGradient>
         </defs>
