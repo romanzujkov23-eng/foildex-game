@@ -216,9 +216,141 @@ const CardArt = (() => {
     `;
   }
 
+  function dragonShape(rng, base, dark, glow) {
+    // крупная рептилия: рогатая голова, перепончатые крылья, шипастый хребет
+    const wingSweep = range(rng, -4, 6);
+    const spikeN = Math.floor(range(rng, 4, 6));
+    let spikes = '';
+    for (let i = 0; i < spikeN; i++) {
+      const t = i / (spikeN - 1 || 1);
+      const x = 42 + t * 16;
+      spikes += `<path d="M${x},${30 + t * 8} l${range(rng, -1, 1)},-7 l3,6 Z" fill="${dark}"/>`;
+    }
+    return `
+      <path d="M50,30 Q22,${20 + wingSweep} 8,${40 + wingSweep} Q26,${40} 34,${52}
+               Q20,${54} 12,${68 + wingSweep} Q32,${64} 40,${54} Z"
+            fill="url(#bodyGrad)" stroke="rgba(0,0,0,.5)" stroke-width="1.3" opacity="0.95"/>
+      <path d="M50,30 Q78,${20 + wingSweep} 92,${40 + wingSweep} Q74,${40} 66,${52}
+               Q80,${54} 88,${68 + wingSweep} Q68,${64} 60,${54} Z"
+            fill="url(#bodyGrad)" stroke="rgba(0,0,0,.5)" stroke-width="1.3" opacity="0.95"/>
+      <path d="M34,${58} Q50,${52} 66,${58} Q70,${74} 50,${88} Q30,${74} 34,${58} Z"
+            fill="url(#bodyGrad)" stroke="rgba(0,0,0,.55)" stroke-width="1.4"/>
+      <path d="M38,26 L32,10 L42,22 Z" fill="${dark}"/>
+      <path d="M62,26 L68,10 L58,22 Z" fill="${dark}"/>
+      ${spikes}
+      <path d="M42,${64} L36,${74} M58,${64} L64,${74}" stroke="${dark}" stroke-width="1.8" stroke-linecap="round" opacity="0.7"/>
+      ${eyes(43, 38, 57, 38, 2.1, glow)}
+    `;
+  }
+
+  function mageShape(rng, base, dark, glow) {
+    // фигура в капюшоне с посохом и парящими рунами
+    const hoodTilt = range(rng, -3, 3);
+    const runeN = Math.floor(range(rng, 3, 5));
+    let runes = '';
+    for (let i = 0; i < runeN; i++) {
+      const ang = (i / runeN) * Math.PI * 2 + range(rng, -0.3, 0.3);
+      const rx = 50 + Math.cos(ang) * 30, ry = 46 + Math.sin(ang) * 22;
+      runes += `<rect x="${rx - 1.6}" y="${ry - 1.6}" width="3.2" height="3.2" fill="${glow}" opacity="0.75" transform="rotate(${range(rng, 0, 90)} ${rx} ${ry})"/>`;
+    }
+    return `
+      <path d="M50,${16 + hoodTilt} Q30,${22} 26,${44} L22,${90} Q50,${98} 78,${90} L74,${44} Q70,${22} 50,${16 + hoodTilt} Z"
+            fill="url(#bodyGrad)" stroke="rgba(0,0,0,.55)" stroke-width="1.4"/>
+      <path d="M50,${16 + hoodTilt} Q34,${24} 32,${42} Q50,${52} 68,${42} Q66,${24} 50,${16 + hoodTilt} Z"
+            fill="${dark}" opacity="0.92"/>
+      <ellipse cx="50" cy="40" rx="10" ry="8" fill="rgba(4,4,8,0.9)"/>
+      <path d="M78,20 L80,86" stroke="${dark}" stroke-width="2.6" stroke-linecap="round"/>
+      <circle cx="79" cy="18" r="4.4" fill="${glow}" opacity="0.9"/>
+      <circle cx="79" cy="18" r="8" fill="${glow}" opacity="0.3"/>
+      ${runes}
+      ${eyes(45, 40, 55, 40, 1.7, glow)}
+    `;
+  }
+
+  function knightShape(rng, base, dark, glow) {
+    // латник с мечом и щитом
+    const plumeSway = range(rng, -4, 4);
+    return `
+      <path d="M50,12 Q62,14 64,26 Q66,36 58,40 Q50,44 42,40 Q34,36 36,26 Q38,14 50,12 Z"
+            fill="url(#bodyGrad)" stroke="rgba(0,0,0,.55)" stroke-width="1.3"/>
+      <rect x="42" y="26" width="16" height="6" rx="1" fill="${dark}" opacity="0.9"/>
+      <path d="M50,10 Q${50 + plumeSway},0 ${46 + plumeSway},4 Q${52 + plumeSway},2 50,10 Z" fill="${glow}" opacity="0.85"/>
+      <path d="M38,44 Q50,38 62,44 L68,${78} Q50,${92} 32,${78} Z"
+            fill="url(#bodyGrad)" stroke="rgba(0,0,0,.55)" stroke-width="1.4"/>
+      <path d="M50,44 L50,84 M40,54 L60,54" stroke="${alpha(base, 0.85)}" stroke-width="2" stroke-linecap="round"/>
+      <path d="M66,50 L86,42 L88,66 L70,70 Z" fill="${dark}" stroke="rgba(0,0,0,.5)" stroke-width="1"/>
+      <path d="M30,48 L${30},80 M30,48 L24,52 L24,76 L30,80" fill="none" stroke="${dark}" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx="30" cy="80" r="2" fill="${glow}"/>
+      ${eyes(45, 24, 55, 24, 1.6, glow)}
+    `;
+  }
+
+  function undeadShape(rng, base, dark, glow) {
+    // истлевший силуэт: рёбра, рваный плащ, оскал черепа
+    const tatterN = Math.floor(range(rng, 4, 6));
+    let tatters = '';
+    for (let i = 0; i < tatterN; i++) {
+      const t = i / (tatterN - 1 || 1);
+      const x = 26 + t * 48;
+      tatters += `<path d="M${x},70 Q${x + range(rng, -3, 3)},${84 + (i % 2) * 8} ${x - 3},${96}" stroke="${dark}" stroke-width="1.6" fill="none" opacity="0.7" stroke-linecap="round"/>`;
+    }
+    return `
+      <path d="M50,14 Q62,16 62,28 Q62,38 50,40 Q38,38 38,28 Q38,16 50,14 Z"
+            fill="${alpha('#e8e2d8', 0.92)}" stroke="rgba(0,0,0,.5)" stroke-width="1.2"/>
+      <path d="M43,30 L47,34 M57,30 L53,34" stroke="rgba(0,0,0,.6)" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M46,34 L44,38 L48,38 M52,34 L54,38 L50,38" stroke="rgba(0,0,0,.5)" stroke-width="1" fill="none"/>
+      <path d="M40,42 Q50,38 60,42 L64,${72} Q50,${80} 36,${72} Z"
+            fill="url(#bodyGrad)" stroke="rgba(0,0,0,.5)" stroke-width="1.3" opacity="0.9"/>
+      <path d="M44,46 L44,68 M50,44 L50,70 M56,46 L56,68" stroke="rgba(0,0,0,.4)" stroke-width="1.2" opacity="0.6"/>
+      ${tatters}
+      <path d="M30,50 L18,70 L26,74 L36,56" fill="${dark}" opacity="0.85"/>
+      ${eyes(45, 26, 55, 26, 1.9, glow)}
+    `;
+  }
+
+  function demonShape(rng, base, dark, glow) {
+    // рогатая крылатая фигура с когтями
+    const hornCurl = range(rng, 2, 6);
+    return `
+      <path d="M36,20 Q28,${8 - hornCurl} 22,${4} Q30,${16} 34,${28} Z" fill="${dark}"/>
+      <path d="M64,20 Q72,${8 - hornCurl} 78,${4} Q70,${16} 66,${28} Z" fill="${dark}"/>
+      <path d="M50,16 Q64,18 64,32 Q64,44 50,48 Q36,44 36,32 Q36,18 50,16 Z"
+            fill="url(#bodyGrad)" stroke="rgba(0,0,0,.5)" stroke-width="1.3"/>
+      <path d="M50,50 Q22,${44} 10,${60} Q30,${58} 42,${64} Q26,${68} 16,${82} Q38,${76} 46,${66}"
+            fill="none" stroke="${dark}" stroke-width="8" stroke-linecap="round" opacity="0.85"/>
+      <path d="M50,50 Q78,${44} 90,${60} Q70,${58} 58,${64} Q74,${68} 84,${82} Q62,${76} 54,${66}"
+            fill="none" stroke="${dark}" stroke-width="8" stroke-linecap="round" opacity="0.85"/>
+      <path d="M40,50 Q50,46 60,50 L64,${80} Q50,${92} 36,${80} Z"
+            fill="url(#bodyGrad)" stroke="rgba(0,0,0,.5)" stroke-width="1.3"/>
+      <path d="M60,80 Q72,88 70,${98}" stroke="${dark}" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M68,${94} L74,${90} L72,${98} Z" fill="${dark}"/>
+      ${eyes(44, 32, 56, 32, 2, glow)}
+    `;
+  }
+
+  function witchShape(rng, base, dark, glow) {
+    // сутулая фигура в капюшоне с изогнутым посохом
+    const hunch = range(rng, 2, 6);
+    return `
+      <path d="M46,${14 + hunch} Q28,${20 + hunch} 24,${42 + hunch} L20,${90} Q48,${98} 72,${88}
+               L${66},${40 + hunch} Q62,${18 + hunch} 46,${14 + hunch} Z"
+            fill="url(#bodyGrad)" stroke="rgba(0,0,0,.55)" stroke-width="1.4"/>
+      <path d="M44,${16 + hunch} Q30,${22 + hunch} 28,${38 + hunch} Q46,${48 + hunch} 62,${36 + hunch}
+               Q58,${20 + hunch} 44,${16 + hunch} Z" fill="${dark}" opacity="0.92"/>
+      <ellipse cx="46" cy="${36 + hunch}" rx="9" ry="7" fill="rgba(4,4,8,0.9)"/>
+      <path d="M76,24 Q80,60 72,92" stroke="${dark}" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <path d="M76,24 Q82,18 78,12 Q72,16 76,24 Z" fill="${glow}" opacity="0.85"/>
+      <path d="M18,${60 + hunch} Q10,${64 + hunch} 12,${76 + hunch} Q20,${78 + hunch} 24,${70 + hunch}"
+            fill="none" stroke="${dark}" stroke-width="2" opacity="0.6"/>
+      ${eyes(42, 38 + hunch, 50, 38 + hunch, 1.6, glow)}
+    `;
+  }
+
   const SHAPES = {
     beast: beastShape, bird: birdShape, serpent: serpentShape,
     insect: insectShape, spirit: spiritShape, guardian: guardianShape,
+    dragon: dragonShape, mage: mageShape, knight: knightShape,
+    undead: undeadShape, demon: demonShape, witch: witchShape,
   };
 
   /* ==========================================================

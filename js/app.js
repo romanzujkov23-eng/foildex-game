@@ -24,9 +24,12 @@ const COIN_ICON = `<svg class="coin-icon" viewBox="0 0 24 24" xmlns="http://www.
 </svg>`;
 
 let state = null;
-let currentTier = 1;
-let deckSlots = [null, null, null, null, null];
+let selectedLevelId = null;
+let deckSlots = [];         // id карт текущей строящейся колоды (8-12, с повторами)
 let collectionFilter = 'all';
+let battleState = null;     // объект боя из BattleSystem
+let selectedAttackerUid = null;
+let battleLogShown = 0;     // сколько строк лога уже показано в UI
 
 const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
 
@@ -54,6 +57,8 @@ function defaultState() {
     losses: 0,
     lastDaily: 0,
     soundOn: true,
+    clearedLevels: [],
+    playerDeck: [],
   };
 }
 
@@ -65,10 +70,12 @@ async function loadState() {
     state = defaultState();
   }
   if (state.soundOn === undefined) state.soundOn = true;
-  // Миграция старых сохранений — досоздаём новые pity-счётчики, если их ещё нет
+  // Миграция старых сохранений — досоздаём новые поля, если их ещё нет
   if (state.epicPity === undefined) state.epicPity = 0;
   if (state.legendaryPity === undefined) state.legendaryPity = 0;
   if (state.mythicPity === undefined) state.mythicPity = 0;
+  if (!state.clearedLevels) state.clearedLevels = [];
+  if (!state.playerDeck) state.playerDeck = [];
   SoundSystem.setEnabled(state.soundOn);
 }
 
@@ -184,6 +191,7 @@ function buildCardNode(card, opts = {}) {
     badge.className = 'card-count-badge';
     badge.textContent = '×' + count;
     el.appendChild(badge);
+    el.classList.add('has-count');
   }
 
   if (onClick) { el.addEventListener('click', onClick); }
@@ -250,7 +258,7 @@ function renderHome() {
   const uniqueOwned = ownedUniqueCards().length;
 
   /* ---- обложка-постер (магазинный/журнальный вид) ---- */
-  const coverCard = CARD_BY_ID['n07']; // Мировой Корень — легендарный лик логова
+  const coverCard = CARD_BY_ID['n16']; // Лесная Фея — единственный настоящий фотоарт, витрина логова
   const cover = document.createElement('div');
   cover.className = 'home-cover';
   cover.innerHTML = `
@@ -492,158 +500,366 @@ async function finishReveal() {
   renderHome();
 }
 
-/* ---------------- BATTLE SETUP ---------------- */
+/* ---------------- LEVEL MAP ---------------- */
 
-function tierUnlocked(tier) {
-  if (tier === 1) return true;
-  if (tier === 2) return state.wins >= 5;
-  if (tier === 3) return state.wins >= 15;
-  return false;
-}
-
-function renderBattleSetup() {
-  const el = document.getElementById('battle-setup-content');
+function renderLevelSelect() {
+  const el = document.getElementById('levels-content');
   el.innerHTML = '';
 
   const owned = ownedUniqueCards();
-  if (owned.length < 5) {
+  if (owned.length < MIN_DECK_SIZE) {
     el.innerHTML = `<div class="empty-state">
       <div class="big">🃏</div>
-      <p>Нужно минимум 5 разных карт в коллекции, чтобы собрать боевой отряд.<br>Открой ещё бустеров!</p>
+      <p>Нужно минимум ${MIN_DECK_SIZE} разных карт в коллекции, чтобы собрать боевую колоду.<br>Открой ещё бустеров!</p>
     </div>`;
     return;
   }
 
-  deckSlots = deckSlots.map(id => (id && ownedCount(id) > 0) ? id : null);
+  const intro = document.createElement('div');
+  intro.className = 'panel';
+  intro.innerHTML = `<div class="hero-title" style="font-size:16px;">Карта Арены</div>
+    <p class="hero-sub">Проходи уровни по порядку. Боссы отмечены короной — сильнее, но щедрее на золото. Стихии противника показаны заранее: подбирай колоду под контр-стихию!</p>`;
+  el.appendChild(intro);
 
-  const tierPanel = document.createElement('div');
-  tierPanel.className = 'panel';
-  tierPanel.innerHTML = `<div class="hero-title" style="font-size:16px;">Выбери соперника</div>`;
-  const tierRow = document.createElement('div');
-  tierRow.className = 'tier-row';
-  [[1, 'Бродяга'], [2, 'Клинок Ночи'], [3, 'Владыка Арены']].forEach(([t, label]) => {
-    const btn = document.createElement('button');
-    btn.className = 'tier-btn' + (currentTier === t ? ' active' : '');
-    const unlocked = tierUnlocked(t);
-    btn.disabled = !unlocked;
-    btn.textContent = unlocked ? label : `🔒 ${label}`;
-    btn.onclick = () => { currentTier = t; renderBattleSetup(); };
-    tierRow.appendChild(btn);
+  const list = document.createElement('div');
+  list.className = 'level-list';
+
+  LEVELS.forEach(level => {
+    const unlocked = isLevelUnlocked(level.id, state);
+    const cleared = isLevelCleared(level.id, state);
+    const elInfo = ELEMENTS[level.element];
+
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'level-card' + (level.isBoss ? ' boss' : '') + (unlocked ? '' : ' locked') + (cleared ? ' cleared' : '');
+    card.disabled = !unlocked;
+    card.innerHTML = `
+      <div class="level-num">${level.isBoss ? '👑' : level.id}</div>
+      <div class="level-info">
+        <div class="level-name">${unlocked ? level.name : '???'}</div>
+        <div class="level-meta">
+          ${unlocked ? `<span class="tag-sm" style="--tc:${elInfo.color}">${elInfo.emoji} ${elInfo.label}</span>` : ''}
+          ${unlocked ? `<span class="tag-sm">❤ ${level.faceHp}</span>` : ''}
+          ${unlocked ? `<span class="tag-sm gold">💰 ${level.goldMin}–${level.goldMax}</span>` : ''}
+        </div>
+      </div>
+      <div class="level-status">${cleared ? '✅' : (unlocked ? '▶' : '🔒')}</div>
+    `;
+    if (unlocked) {
+      card.onclick = () => {
+        SoundSystem.tap();
+        selectedLevelId = level.id;
+        deckSlots = state.playerDeck.filter(id => ownedCount(id) > 0).slice(0, MAX_DECK_SIZE);
+        showScreen('screen-deckbuilder');
+        renderDeckBuilder();
+      };
+    }
+    list.appendChild(card);
   });
-  tierPanel.appendChild(tierRow);
-  el.appendChild(tierPanel);
+
+  el.appendChild(list);
+}
+
+/* ---------------- DECK BUILDER ---------------- */
+
+function renderDeckBuilder() {
+  const level = getLevel(selectedLevelId);
+  const el = document.getElementById('deckbuilder-content');
+  el.innerHTML = '';
+  if (!level) return;
+
+  const elInfo = ELEMENTS[level.element];
+  const playerDom = dominantElement(deckSlots);
+  const matchup = matchupInfo(playerDom, level.element);
+
+  const enemyPanel = document.createElement('div');
+  enemyPanel.className = 'panel';
+  enemyPanel.innerHTML = `
+    <div class="hero-title" style="font-size:16px;">${level.isBoss ? '👑 ' : ''}${level.name}</div>
+    <div class="level-meta" style="margin:6px 0 10px;">
+      <span class="tag-sm" style="--tc:${elInfo.color}">${elInfo.emoji} ${elInfo.label}</span>
+      <span class="tag-sm">❤ ${level.faceHp}</span>
+      <span class="tag-sm">🃏 ${level.deckSize} карт</span>
+      <span class="tag-sm gold">💰 ${level.goldMin}–${level.goldMax}</span>
+    </div>
+    <div class="matchup-banner matchup-${matchup.state}">
+      ${matchup.state === 'favor' ? `✅ Твоя стихия (${playerDom ? ELEMENTS[playerDom].label : '?'}) сильнее ${elInfo.label} — бонус к урону в бою!` : ''}
+      ${matchup.state === 'against' ? `⚠️ Стихия соперника (${elInfo.label}) сильнее твоей (${playerDom ? ELEMENTS[playerDom].label : '?'}) — будь осторожен` : ''}
+      ${matchup.state === 'neutral' ? `⚖️ Нейтральный матчап стихий` : ''}
+    </div>
+  `;
+  el.appendChild(enemyPanel);
 
   const deckPanel = document.createElement('div');
   deckPanel.className = 'panel';
-  deckPanel.innerHTML = `<div class="hero-title" style="font-size:16px;">Твой отряд теней (порядок важен!)</div>
-    <p class="hero-sub">Первая карта встретит соперника первой. Победивший остаётся на поле с текущим здоровьем.</p>`;
+  deckPanel.innerHTML = `<div class="hero-title" style="font-size:16px;">Твоя колода (${deckSlots.length}/${MAX_DECK_SIZE}, минимум ${MIN_DECK_SIZE})</div>
+    <p class="hero-sub">Тапни карту снизу, чтобы добавить. Тапни карту в колоде, чтобы убрать.</p>`;
+
   const slotsRow = document.createElement('div');
-  slotsRow.className = 'deck-slots';
+  slotsRow.className = 'deckbuilder-slots';
   deckSlots.forEach((cardId, idx) => {
-    const slot = document.createElement('div');
-    slot.className = 'deck-slot' + (cardId ? ' filled' : '');
-    if (cardId) {
-      const card = CARD_BY_ID[cardId];
-      const node = buildCardNode(card, { onClick: () => { deckSlots[idx] = null; renderBattleSetup(); } });
-      slot.appendChild(node);
-    } else {
-      slot.textContent = (idx + 1).toString();
-      slot.onclick = () => {};
-    }
-    slotsRow.appendChild(slot);
+    const card = CARD_BY_ID[cardId];
+    const node = buildCardNode(card, { onClick: () => { deckSlots.splice(idx, 1); renderDeckBuilder(); } });
+    slotsRow.appendChild(node);
   });
+  for (let i = deckSlots.length; i < MIN_DECK_SIZE; i++) {
+    const empty = document.createElement('div');
+    empty.className = 'deck-slot';
+    empty.textContent = (i + 1).toString();
+    slotsRow.appendChild(empty);
+  }
   deckPanel.appendChild(slotsRow);
 
   const startBtn = document.createElement('button');
   startBtn.className = 'btn';
   startBtn.textContent = 'В бой!';
-  const filled = deckSlots.every(s => s !== null);
-  startBtn.disabled = !filled;
-  startBtn.onclick = () => runBattle();
+  startBtn.disabled = deckSlots.length < MIN_DECK_SIZE;
+  startBtn.onclick = () => startInteractiveBattle(level);
   deckPanel.appendChild(startBtn);
   el.appendChild(deckPanel);
 
   const pickTitle = document.createElement('div');
   pickTitle.className = 'section-title';
-  pickTitle.textContent = 'Выбери карты (тапни, чтобы добавить)';
+  pickTitle.textContent = 'Твои карты';
   el.appendChild(pickTitle);
 
   const pickGrid = document.createElement('div');
   pickGrid.className = 'pick-grid';
   const rarityRank = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, mythic: 5 };
+  const owned = ownedUniqueCards();
   owned.sort((a, b) => rarityRank[b.rarity] - rarityRank[a.rarity]).forEach(card => {
-    const isSelected = deckSlots.includes(card.id);
+    const inDeckCount = deckSlots.filter(id => id === card.id).length;
+    const canAddMore = inDeckCount < ownedCount(card.id) && deckSlots.length < MAX_DECK_SIZE;
     const node = buildCardNode(card, {
       count: ownedCount(card.id),
-      selected: isSelected,
+      selected: inDeckCount > 0,
       onClick: () => {
-        if (isSelected) return;
-        const emptyIdx = deckSlots.indexOf(null);
-        if (emptyIdx === -1) return;
-        deckSlots[emptyIdx] = card.id;
-        renderBattleSetup();
+        if (!canAddMore) return;
+        deckSlots.push(card.id);
+        renderDeckBuilder();
       },
     });
+    if (!canAddMore && inDeckCount === 0) node.style.opacity = '0.4';
     pickGrid.appendChild(node);
   });
   el.appendChild(pickGrid);
 }
 
-/* ---------------- BATTLE EXECUTION ---------------- */
+/* ---------------- INTERACTIVE BATTLE ---------------- */
 
-async function runBattle() {
-  const playerCards = deckSlots.map(id => CARD_BY_ID[id]);
-  const aiCards = BattleSystem.getAiTeam(currentTier);
-  const result = BattleSystem.simulate(playerCards, aiCards);
+function startInteractiveBattle(level) {
+  state.playerDeck = deckSlots.slice();
+  saveState();
 
-  showScreen('screen-battle-log');
-  const vsRow = document.getElementById('vs-row');
-  vsRow.innerHTML = `<span>Ты</span><span style="color:var(--text-dim); font-weight:400;">против</span><span>Соперник</span>`;
-  const logBox = document.getElementById('log-box');
-  logBox.innerHTML = '';
-  document.getElementById('battle-result-holder').innerHTML = '';
-  const doneBtn = document.getElementById('battle-log-done-btn');
-  doneBtn.style.display = 'none';
+  battleState = BattleSystem.createBattle(deckSlots.slice(), level);
+  selectedAttackerUid = null;
+  battleLogShown = 0;
 
-  let i = 0;
-  const interval = setInterval(() => {
-    if (i >= result.log.length) {
-      clearInterval(interval);
-      finishBattle(result);
-      return;
-    }
-    const line = document.createElement('div');
-    line.className = 'log-line';
-    line.textContent = result.log[i];
-    logBox.appendChild(line);
-    logBox.scrollTop = logBox.scrollHeight;
-    if (result.log[i].includes('⚔️')) SoundSystem.battleHit();
-    i++;
-  }, 260);
+  showScreen('screen-battle');
+  document.getElementById('battle-result-overlay').classList.remove('show');
+  SoundSystem.tap();
+  renderBattleScreen();
+  flushBattleLog();
 }
 
-async function finishBattle(result) {
-  let reward = 10;
-  if (result.playerWon) { reward = 35; state.wins += 1; haptic('success'); SoundSystem.victory(); }
-  else if (result.draw) { reward = 18; haptic('warning'); }
-  else { reward = 10; state.losses += 1; haptic('error'); SoundSystem.defeat(); }
+function buildBattleUnitNode(unit, { side, selectable, targetable, onClick }) {
+  const el = document.createElement('div');
+  el.className = `unit-card rarity-${unit.rarity}`;
+  if (STANDOUT_RARITIES.includes(unit.rarity)) el.classList.add('holo');
+  if (selectable) el.classList.add('can-act');
+  if (selectedAttackerUid === unit.uid) el.classList.add('selected');
+  if (targetable) el.classList.add('target-highlight');
 
-  state.shards += reward;
-  await saveState();
+  const elInfo = ELEMENTS[unit.element];
+  const hpPct = Math.max(0, Math.round((unit.hp / unit.maxHp) * 100));
+  el.innerHTML = `
+    <div class="unit-art">${CardArt.render(unit)}</div>
+    <span class="unit-element" style="--tc:${elInfo.color}">${elInfo.emoji}</span>
+    ${side === 'player' && !unit.hasAttacked && !unit.justPlayed ? '<span class="unit-ready-dot"></span>' : ''}
+    <div class="unit-name">${unit.name}</div>
+    <div class="unit-bottom">
+      <span class="unit-atk">⚔ ${unit.attack}</span>
+      <div class="unit-hp-bar"><div class="unit-hp-fill" style="width:${hpPct}%"></div></div>
+      <span class="unit-hp">${unit.hp}</span>
+    </div>
+  `;
+  if (onClick) el.addEventListener('click', onClick);
+  return el;
+}
 
-  const holder = document.getElementById('battle-result-holder');
-  const label = result.playerWon ? 'Победа!' : (result.draw ? 'Ничья' : 'Поражение');
-  const cls = result.playerWon ? 'win' : (result.draw ? 'draw' : 'lose');
-  holder.innerHTML = `<div class="battle-result ${cls}">${label}</div>
-    <p class="hero-sub" style="text-align:center;">+${reward} ${COIN_ICON}</p>`;
+function renderBattleScreen() {
+  if (!battleState) return;
+  const s = battleState;
 
-  const doneBtn = document.getElementById('battle-log-done-btn');
-  doneBtn.style.display = 'block';
-  doneBtn.onclick = () => {
-    deckSlots = [null, null, null, null, null];
+  document.getElementById('bf-enemy-name').textContent = (s.level.isBoss ? '👑 ' : '') + s.level.name;
+  const ePct = Math.max(0, Math.round((s.ai.faceHp / s.ai.faceMaxHp) * 100));
+  document.getElementById('bf-enemy-hp-fill').style.width = ePct + '%';
+  document.getElementById('bf-enemy-hp-text').textContent = `${Math.max(0, s.ai.faceHp)}/${s.ai.faceMaxHp}`;
+  document.getElementById('bf-enemy-deck-count').textContent = `🂠 ${s.ai.deck.length}`;
+
+  const pPct = Math.max(0, Math.round((s.player.faceHp / s.player.faceMaxHp) * 100));
+  document.getElementById('bf-player-hp-fill').style.width = pPct + '%';
+  document.getElementById('bf-player-hp-text').textContent = `${Math.max(0, s.player.faceHp)}/${s.player.faceMaxHp}`;
+
+  const isPlayerTurn = s.turn === 'player' && !s.over;
+  const attackerSelected = !!selectedAttackerUid;
+
+  // вражеское поле — цели для атаки, если выбран атакующий
+  const enemyBoard = document.getElementById('bf-enemy-board');
+  enemyBoard.innerHTML = '';
+  s.ai.board.forEach(unit => {
+    const node = buildBattleUnitNode(unit, {
+      side: 'ai',
+      targetable: isPlayerTurn && attackerSelected,
+      onClick: () => {
+        if (!isPlayerTurn || !attackerSelected) return;
+        const ok = BattleSystem.attack(s, 'player', selectedAttackerUid, 'creature', unit.uid);
+        if (ok) { haptic('medium'); SoundSystem.battleHit(); }
+        selectedAttackerUid = null;
+        renderBattleScreen();
+        flushBattleLog();
+        checkBattleOver();
+      },
+    });
+    enemyBoard.appendChild(node);
+  });
+  // портрет-лицо соперника — тоже кликабельная цель, если выбран атакующий
+  const enemyInfo = document.getElementById('bf-enemy-info');
+  enemyInfo.classList.toggle('face-targetable', isPlayerTurn && attackerSelected);
+  enemyInfo.onclick = () => { if (isPlayerTurn && attackerSelected) attackEnemyFace(); };
+
+  // поле игрока
+  const playerBoard = document.getElementById('bf-player-board');
+  playerBoard.innerHTML = '';
+  s.player.board.forEach(unit => {
+    const canAct = isPlayerTurn && BattleSystem.canAttack(s, 'player', unit.uid);
+    const node = buildBattleUnitNode(unit, {
+      side: 'player',
+      selectable: canAct,
+      onClick: () => {
+        if (!canAct && selectedAttackerUid !== unit.uid) return;
+        selectedAttackerUid = (selectedAttackerUid === unit.uid) ? null : unit.uid;
+        haptic('light');
+        renderBattleScreen();
+      },
+    });
+    playerBoard.appendChild(node);
+  });
+
+  // мана
+  const manaRow = document.getElementById('bf-mana-row');
+  manaRow.innerHTML = '';
+  for (let i = 1; i <= s.player.maxMana; i++) {
+    const gem = document.createElement('span');
+    gem.className = 'mana-crystal' + (i <= s.player.mana ? ' full' : '');
+    manaRow.appendChild(gem);
+  }
+  const manaLabel = document.createElement('span');
+  manaLabel.className = 'mana-label';
+  manaLabel.textContent = `${s.player.mana}/${s.player.maxMana}`;
+  manaRow.appendChild(manaLabel);
+
+  // рука игрока
+  const handRow = document.getElementById('bf-hand-row');
+  handRow.innerHTML = '';
+  s.player.hand.forEach(card => {
+    const affordable = isPlayerTurn && BattleSystem.canPlay(s, 'player', card.uid);
+    const node = buildCardNode(card, { variant: 'mini' });
+    node.classList.add('hand-card');
+    if (!affordable) node.classList.add('unaffordable');
+    node.onclick = () => {
+      if (!affordable) { if (isPlayerTurn) toast('Не хватает маны или поле заполнено'); return; }
+      BattleSystem.playCard(s, 'player', card.uid);
+      haptic('light');
+      SoundSystem.tap();
+      renderBattleScreen();
+      flushBattleLog();
+      checkBattleOver();
+    };
+    handRow.appendChild(node);
+  });
+
+  const endBtn = document.getElementById('bf-end-turn-btn');
+  endBtn.disabled = !isPlayerTurn;
+  endBtn.textContent = isPlayerTurn ? 'Завершить ход' : `Ход соперника…`;
+}
+
+function attackEnemyFace() {
+  if (!battleState || battleState.turn !== 'player' || !selectedAttackerUid) return;
+  const ok = BattleSystem.attack(battleState, 'player', selectedAttackerUid, 'face');
+  if (ok) { haptic('heavy'); SoundSystem.battleHit(); }
+  selectedAttackerUid = null;
+  renderBattleScreen();
+  flushBattleLog();
+  checkBattleOver();
+}
+
+function flushBattleLog() {
+  if (!battleState) return;
+  const strip = document.getElementById('battle-log-strip');
+  const newLines = battleState.log.slice(battleLogShown);
+  battleLogShown = battleState.log.length;
+  newLines.forEach(line => {
+    const el = document.createElement('div');
+    el.className = 'log-line-b';
+    el.textContent = line;
+    strip.appendChild(el);
+  });
+  strip.scrollTop = strip.scrollHeight;
+  while (strip.childNodes.length > 40) strip.removeChild(strip.firstChild);
+}
+
+function checkBattleOver() {
+  if (!battleState || !battleState.over) return;
+  const s = battleState;
+  const won = s.winner === 'player';
+  const level = s.level;
+
+  let reward = 0;
+  if (won) {
+    reward = rollLevelGold(level);
+    state.shards += reward;
+    state.wins += 1;
+    if (!state.clearedLevels.includes(level.id)) state.clearedLevels.push(level.id);
+    haptic('success');
+    SoundSystem.victory();
+  } else {
+    reward = Math.round(level.goldMin * 0.3);
+    state.shards += reward;
+    state.losses += 1;
+    haptic('error');
+    SoundSystem.defeat();
+  }
+  saveState();
+  syncShardDisplays();
+
+  const overlay = document.getElementById('battle-result-overlay');
+  const card = document.getElementById('battle-result-card');
+  const nextLevel = getLevel(level.id + 1);
+  card.innerHTML = `
+    <div class="battle-result ${won ? 'win' : 'lose'}">${won ? (level.isBoss ? '👑 Босс повержен!' : 'Победа!') : 'Поражение'}</div>
+    <p class="hero-sub" style="text-align:center;">+${reward} ${COIN_ICON}</p>
+    <div class="battle-result-actions">
+      <button class="btn ghost" id="battle-result-map-btn">К карте</button>
+      ${won && nextLevel && isLevelUnlocked(nextLevel.id, state) ? `<button class="btn" id="battle-result-next-btn">Следующий уровень →</button>` : ''}
+    </div>
+  `;
+  overlay.classList.add('show');
+
+  document.getElementById('battle-result-map-btn').onclick = () => {
+    overlay.classList.remove('show');
     showScreen('screen-battle-setup');
-    renderBattleSetup();
+    renderLevelSelect();
   };
+  const nextBtn = document.getElementById('battle-result-next-btn');
+  if (nextBtn) {
+    nextBtn.onclick = () => {
+      overlay.classList.remove('show');
+      selectedLevelId = nextLevel.id;
+      showScreen('screen-deckbuilder');
+      renderDeckBuilder();
+    };
+  }
 }
 
 /* ---------------- INIT ---------------- */
@@ -656,7 +872,7 @@ function bindStaticEvents() {
       showScreen(TAB_SCREENS[key]);
       if (key === 'home') renderHome();
       if (key === 'collection') renderCollection();
-      if (key === 'battle') renderBattleSetup();
+      if (key === 'battle') renderLevelSelect();
     });
   });
 
@@ -683,10 +899,31 @@ function bindStaticEvents() {
     }
   });
 
+  document.getElementById('deckbuilder-back-btn').addEventListener('click', () => {
+    SoundSystem.tap();
+    showScreen('screen-battle-setup');
+    renderLevelSelect();
+  });
+
+  document.getElementById('bf-end-turn-btn').addEventListener('click', () => {
+    if (!battleState || battleState.turn !== 'player' || battleState.over) return;
+    selectedAttackerUid = null;
+    SoundSystem.tap();
+    BattleSystem.endTurn(battleState, 'player');
+    renderBattleScreen();
+    flushBattleLog();
+    checkBattleOver();
+  });
+
   if (tg && tg.BackButton) {
     tg.BackButton.onClick(() => {
       if (document.getElementById('card-modal').classList.contains('active')) {
         closeCardModal();
+        return;
+      }
+      if (document.getElementById('screen-deckbuilder').classList.contains('active')) {
+        showScreen('screen-battle-setup');
+        renderLevelSelect();
         return;
       }
       showScreen('screen-home');

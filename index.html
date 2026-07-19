@@ -62,7 +62,7 @@
     </div>
   </div>
 
-  <!-- ===== BATTLE SETUP ===== -->
+  <!-- ===== LEVEL MAP (Арена) ===== -->
   <div class="screen" id="screen-battle-setup">
     <div class="topbar">
       <div class="brand">Арена</div>
@@ -81,7 +81,16 @@
   <circle cx="12" cy="14.6" r="2.1" fill="none" stroke="#8a6423" stroke-width="0.7"/>
 </svg><span id="shard-count-3">0</span></div>
     </div>
-    <div class="content" id="battle-setup-content"></div>
+    <div class="content" id="levels-content"></div>
+  </div>
+
+  <!-- ===== DECK BUILDER ===== -->
+  <div class="screen" id="screen-deckbuilder">
+    <div class="topbar">
+      <button class="btn ghost" id="deckbuilder-back-btn" style="width:auto;padding:8px 14px;">← Назад</button>
+      <div class="brand" style="font-size:15px;">Сбор колоды</div>
+    </div>
+    <div class="content" id="deckbuilder-content"></div>
   </div>
 
   <!-- ===== TABBAR ===== -->
@@ -140,13 +149,39 @@
     </div>
   </div>
 
-  <!-- ===== BATTLE LOG ===== -->
-  <div class="screen" id="screen-battle-log">
-    <div class="battle-log-screen">
-      <div class="vs-row" id="vs-row"></div>
-      <div class="log-box" id="log-box"></div>
-      <div id="battle-result-holder"></div>
-      <button class="btn" id="battle-log-done-btn" style="display:none;">Забрать награду</button>
+  <!-- ===== BATTLE ARENA (интерактивный бой) ===== -->
+  <div class="screen" id="screen-battle">
+    <div class="battle-arena" id="battle-arena">
+      <div class="bf-enemy-info" id="bf-enemy-info">
+        <div class="bf-name" id="bf-enemy-name">Соперник</div>
+        <div class="hp-bar-row">
+          <div class="hp-bar"><div class="hp-bar-fill" id="bf-enemy-hp-fill"></div></div>
+          <span class="hp-bar-text" id="bf-enemy-hp-text">30/30</span>
+        </div>
+        <div class="deck-count" id="bf-enemy-deck-count">🂠 0</div>
+      </div>
+
+      <div class="board-row enemy" id="bf-enemy-board"></div>
+
+      <div class="battle-log-strip" id="battle-log-strip"></div>
+
+      <div class="board-row player" id="bf-player-board"></div>
+
+      <div class="bf-player-info">
+        <div class="hp-bar-row">
+          <span class="hp-bar-text" id="bf-player-hp-text">30/30</span>
+          <div class="hp-bar"><div class="hp-bar-fill mine" id="bf-player-hp-fill"></div></div>
+        </div>
+        <div class="mana-row" id="bf-mana-row"></div>
+      </div>
+
+      <div class="hand-row" id="bf-hand-row"></div>
+
+      <button class="btn end-turn-btn" id="bf-end-turn-btn">Завершить ход</button>
+    </div>
+
+    <div class="battle-result-overlay" id="battle-result-overlay">
+      <div class="battle-result-card" id="battle-result-card"></div>
     </div>
   </div>
 
@@ -157,6 +192,7 @@
 <script src="js/art.js"></script>
 <script src="js/sound.js"></script>
 <script src="js/pack.js"></script>
+<script src="js/levels.js"></script>
 <script src="js/battle.js"></script>
 <script src="js/app.js"></script>
 </body>
