@@ -376,14 +376,16 @@ html, body {
 .card.rarity-legendary { --rc: var(--c-legendary); }
 .card.rarity-mythic { --rc: var(--c-mythic); }
 
+/* Свечение редких карт — ТОЛЬКО тонкое кольцо вплотную к рамке, без
+   размытия наружу. Размытый box-shadow бы вылезал за пределы карты и
+   упирался в непрозрачный фон соседней карточки в сетке, обрезаясь
+   прямым углом ("квадратный" глоу). Кольцо же всегда остаётся внутри
+   собственной рамки карты — обрезаться там нечему. */
 .card.rarity-epic, .card.rarity-legendary {
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), inset 0 0 0 4px rgba(0,0,0,0.5), 0 0 24px -2px var(--rc);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1), inset 0 0 0 4px rgba(0,0,0,0.5), 0 0 0 1px var(--rc), 0 0 5px 0 var(--rc);
 }
-/* в плотной сетке коллекции соседние непрозрачные карточки обрезают
-   широкое свечение по прямому краю — выглядит "квадратным". Держим
-   свечение мини-карт компактнее, чтобы оно гасло до соседней карты. */
-.card--mini.rarity-epic, .card--mini.rarity-legendary {
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), inset 0 0 0 3px rgba(0,0,0,0.5), 0 0 9px -1px var(--rc);
+.card--full.rarity-epic, .card--full.rarity-legendary {
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1), inset 0 0 0 4px rgba(0,0,0,0.5), 0 0 0 1px var(--rc), 0 0 16px -2px var(--rc);
 }
 .card.rarity-mythic {
   border-color: transparent;
@@ -392,22 +394,22 @@ html, body {
     conic-gradient(from 0deg, #ff3d7a, #ffb238, #4fd8c8, #9b6bff, #ff3d7a);
   background-origin: border-box;
   background-clip: padding-box, border-box;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1), 0 0 26px -1px rgba(255,61,122,0.65);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1), 0 0 0 1px rgba(255,61,122,0.7), 0 0 6px 0 rgba(255,61,122,0.55);
 }
-.card--mini.rarity-mythic {
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1), 0 0 10px -1px rgba(255,61,122,0.6);
+.card--full.rarity-mythic {
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1), 0 0 0 1px rgba(255,61,122,0.7), 0 0 18px -1px rgba(255,61,122,0.65);
 }
-.card.mythic-fx { animation: mythicPulse 2.4s ease-in-out infinite; }
-.card--mini.mythic-fx { animation: mythicPulseMini 2.4s ease-in-out infinite; }
-@keyframes mythicPulse {
-  0%, 100% { filter: drop-shadow(0 0 10px rgba(255,61,122,0.55)); }
-  33% { filter: drop-shadow(0 0 14px rgba(255,178,56,0.6)); }
-  66% { filter: drop-shadow(0 0 14px rgba(79,216,200,0.6)); }
+.card.mythic-fx { animation: mythicPulseRing 2.4s ease-in-out infinite; }
+@keyframes mythicPulseRing {
+  0%, 100% { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1), 0 0 0 1px rgba(255,61,122,0.75), 0 0 7px 0 rgba(255,61,122,0.6); }
+  33%      { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1), 0 0 0 1px rgba(255,178,56,0.75), 0 0 7px 0 rgba(255,178,56,0.6); }
+  66%      { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1), 0 0 0 1px rgba(79,216,200,0.75), 0 0 7px 0 rgba(79,216,200,0.6); }
 }
-@keyframes mythicPulseMini {
-  0%, 100% { filter: drop-shadow(0 0 4px rgba(255,61,122,0.5)); }
-  33% { filter: drop-shadow(0 0 6px rgba(255,178,56,0.55)); }
-  66% { filter: drop-shadow(0 0 6px rgba(79,216,200,0.55)); }
+.card--full.mythic-fx { animation: mythicPulseRingFull 2.4s ease-in-out infinite; }
+@keyframes mythicPulseRingFull {
+  0%, 100% { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1), 0 0 0 1px rgba(255,61,122,0.8), 0 0 20px -1px rgba(255,61,122,0.7); }
+  33%      { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1), 0 0 0 1px rgba(255,178,56,0.8), 0 0 20px -1px rgba(255,178,56,0.7); }
+  66%      { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1), 0 0 0 1px rgba(79,216,200,0.8), 0 0 20px -1px rgba(79,216,200,0.7); }
 }
 .card.holo::after {
   content: '';
@@ -433,31 +435,31 @@ html, body {
 .card.selected { outline: 2px solid var(--accent-violet-2); outline-offset: 1px; }
 
 .card-cost {
-  background: rgba(10,7,20,0.85);
+  background: rgba(10,7,20,0.9);
   border: 1px solid var(--border-bright);
   color: var(--accent-gold);
   border-radius: 50%;
-  width: 19px; height: 19px;
+  width: 21px; height: 21px;
   display: flex; align-items: center; justify-content: center;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   flex-shrink: 0;
+  box-shadow: 0 0 6px rgba(232,182,74,0.4);
 }
-.card-rarity-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--rc); box-shadow: 0 0 5px var(--rc); }
-
-.card-rarity-badge, .card-element-badge {
-  width: 19px; height: 19px;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  background: rgba(10,7,20,0.85);
-  border: 1px solid var(--tc);
-  box-shadow: 0 0 6px var(--tc);
+.card-el-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--tc);
+  border: 1px solid color-mix(in srgb, var(--tc) 55%, transparent);
+  background: color-mix(in srgb, var(--tc) 14%, transparent);
 }
-.card-rarity-badge .ric { font-size: 9px; line-height: 1; color: var(--tc); font-weight: 800; }
-.card-element-badge { font-size: 10.5px; }
-.card--full .card-top, .card--mini .card-top { gap: 4px; }
+.card-el-ic { font-size: 11px; flex-shrink: 0; line-height: 1; }
 
 .card-art-svg { width: 100%; height: 100%; display: block; }
 .card-art-img {
@@ -483,7 +485,7 @@ html, body {
   padding: 7px;
   background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent 30%);
 }
-.card--full .card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+.card--full .card-top { display: flex; }
 .card--full .card-art {
   text-align: center;
   margin: 4px 0;
@@ -496,7 +498,13 @@ html, body {
   overflow: hidden;
   border: 1px solid rgba(0,0,0,0.5);
 }
-.card--full .card-name-plate { text-align: center; }
+.card--full .card-name-plate {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
 .card--full .card-name {
   font-family: var(--font-head);
   font-weight: 700;
@@ -516,11 +524,12 @@ html, body {
 .card--full .card-ability-line .ab-none { opacity: 0.4; }
 .card--full .card-stats {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
+  gap: 22px;
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 12px;
-  padding: 5px 22px 0 0;
+  font-size: 13px;
+  padding-top: 5px;
   margin-top: 3px;
   border-top: 1px solid var(--border);
 }
@@ -529,7 +538,12 @@ html, body {
 .card--full .card-stats .hp { color: var(--accent-teal); }
 .card--full .card-stats .hp::before { content: '♥ '; }
 
-/* ---------- .card--mini (сетка, выбор карт, слоты) ---------- */
+/* ---------- .card--mini (сетка, выбор карт, слоты) ----------
+   Единственные плавающие бейджи: цена (верх-лево) и количество
+   копий (верх-право, если есть) — они всегда на разных углах и
+   никогда не пересекаются. Стихия — маленькая иконка прямо перед
+   именем внизу, а не отдельный кружок. Редкость и так видна по
+   цвету рамки/свечения, отдельный значок для неё не нужен. */
 .card--mini .card-art {
   position: absolute;
   inset: 0;
@@ -538,23 +552,20 @@ html, body {
 }
 .card--mini .card-top {
   position: absolute;
-  top: 5px; left: 5px; right: 5px;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  top: 6px; left: 6px;
   z-index: 2;
 }
 .card--mini .card-scrim {
   position: absolute;
   left: 0; right: 0; bottom: 0;
   z-index: 2;
-  padding: 16px 26px 6px 7px;
-  background: linear-gradient(180deg, transparent, rgba(6,4,14,0.55) 40%, rgba(6,4,14,0.92) 100%);
+  padding: 16px 7px 6px;
+  background: linear-gradient(180deg, transparent, rgba(6,4,14,0.6) 38%, rgba(6,4,14,0.94) 100%);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
-.card--mini.has-count .card-scrim { padding-left: 26px; }
+.card--mini .card-name-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .card--mini .card-name {
   font-family: var(--font-head);
   font-weight: 700;
@@ -564,18 +575,22 @@ html, body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 .card--mini .card-stats {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 12px;
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 10px;
+  font-size: 10.5px;
 }
 .card--mini .card-stats .atk { color: var(--accent-blood); }
 .card--mini .card-stats .atk::before { content: '⚔ '; }
 .card--mini .card-stats .hp { color: var(--accent-teal); }
 .card--mini .card-stats .hp::before { content: '♥ '; }
+/* когда есть кнопка ⓘ, освобождаем ей место, чтобы статы её не задевали */
+.card--mini:not(.card--compact) .card-scrim { padding-right: 26px; }
 
 .card.locked { filter: grayscale(1) brightness(0.35); }
 .card.locked .card-name, .card.locked .card-ability-line, .card.locked .card-stats { visibility: hidden; }
@@ -585,28 +600,25 @@ html, body {
 
 .card-count-badge {
   position: absolute;
-  background: rgba(8,5,18,0.85);
+  top: 6px; right: 6px;
+  background: rgba(8,5,18,0.9);
   border: 1px solid var(--border-bright);
   color: var(--accent-gold);
   border-radius: 999px;
   font-family: var(--font-mono);
   font-weight: 700;
   font-size: 10px;
-  padding: 1px 6px;
+  padding: 2px 7px;
   z-index: 3;
 }
-/* низ-лево — верхний правый угол занят cost/стихия/редкость,
-   низ-право занят кнопкой ⓘ, поэтому бейджу количества остаётся
-   низ-лево, поверх полупрозрачной подложки с именем */
-.card--mini .card-count-badge { bottom: 5px; left: 5px; }
-.card--full .card-count-badge { top: -6px; left: -6px; }
+.card--full .card-count-badge { top: -6px; right: -6px; }
 .card-info-btn {
   position: absolute;
   bottom: 5px;
   right: 5px;
-  width: 19px; height: 19px;
+  width: 20px; height: 20px;
   border-radius: 50%;
-  background: rgba(8,5,18,0.8);
+  background: rgba(8,5,18,0.85);
   border: 1px solid var(--border-bright);
   color: var(--accent-violet-2);
   font-size: 11px;
@@ -852,6 +864,26 @@ html, body {
   background: radial-gradient(ellipse at 50% 0%, rgba(155,107,255,0.08), transparent 60%);
 }
 .bf-enemy-info, .bf-player-info { padding: 0 4px; }
+.bf-hint {
+  position: absolute;
+  top: 6px; left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  z-index: 6;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 11.5px;
+  color: #fff3d6;
+  white-space: nowrap;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(20,10,30,0.92);
+  border: 1px solid var(--accent-violet-2);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5), 0 0 14px rgba(155,107,255,0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.bf-hint.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .bf-enemy-info.face-targetable { cursor: pointer; border-radius: 10px; box-shadow: 0 0 0 2px var(--accent-blood); animation: targetPulse 1s ease-in-out infinite; }
 @keyframes targetPulse { 0%, 100% { box-shadow: 0 0 0 2px rgba(239,86,119,0.9); } 50% { box-shadow: 0 0 0 2px rgba(239,86,119,0.3); } }
 .bf-name { font-family: var(--font-head); font-weight: 700; font-size: 13px; margin-bottom: 3px; }
@@ -941,8 +973,8 @@ html, body {
 .mana-crystal.full { background: linear-gradient(135deg, #6ecbff, #2e8fe0); box-shadow: 0 0 6px rgba(78,168,255,0.7); border-color: #8fd6ff; }
 .mana-label { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); margin-left: 4px; }
 
-.hand-row { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 4px; min-height: 96px; }
-.hand-card { width: 74px; flex-shrink: 0; cursor: pointer; }
+.hand-row { display: flex; gap: 7px; overflow-x: auto; padding: 2px 2px 4px; min-height: 108px; }
+.hand-card { width: 82px; flex-shrink: 0; cursor: pointer; }
 .hand-card.unaffordable { opacity: 0.4; filter: grayscale(0.5); cursor: not-allowed; }
 
 .end-turn-btn { flex-shrink: 0; }
@@ -992,18 +1024,27 @@ html, body {
 }
 .card-modal.active { display: flex; }
 .card-modal-sheet {
+  --rc: var(--c-common);
   position: relative;
   width: 100%;
   max-width: 460px;
   max-height: 88dvh;
   overflow-y: auto;
-  background: linear-gradient(180deg, #1c1430, #100a1c);
+  overflow-x: hidden;
+  background:
+    radial-gradient(ellipse 100% 220px at 50% 0%, color-mix(in srgb, var(--rc) 26%, transparent), transparent 70%),
+    linear-gradient(180deg, #1c1430, #100a1c 55%);
   border: 1px solid var(--border-bright);
+  border-top: 2px solid var(--rc);
   border-bottom: none;
   border-radius: 20px 20px 0 0;
   padding: 20px 18px 30px;
-  box-shadow: 0 -10px 40px rgba(0,0,0,0.6);
+  box-shadow: 0 -10px 50px rgba(0,0,0,0.65), 0 -1px 24px -4px var(--rc);
   animation: sheetUp 0.22s ease;
+}
+.card-modal-sheet.rarity-mythic {
+  border-top: none;
+  border-image: linear-gradient(90deg, #ff3d7a, #ffb238, #4fd8c8, #9b6bff, #ff3d7a) 1;
 }
 @keyframes sheetUp { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 .card-modal-close {
@@ -1021,27 +1062,59 @@ html, body {
 .modal-art-frame {
   width: 190px;
   aspect-ratio: 1/1;
-  margin: 6px auto 14px;
-  border-radius: 16px;
+  margin: 10px auto 12px;
+  border-radius: 18px;
   overflow: hidden;
-  border: 2px solid var(--rc, var(--c-common));
-  box-shadow: 0 0 30px -4px var(--rc, transparent);
+  position: relative;
+  border: 3px solid var(--rc, var(--c-common));
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.08) inset, 0 0 32px -4px var(--rc, transparent), 0 8px 24px rgba(0,0,0,0.5);
+}
+.modal-art-frame.rarity-mythic {
+  border-color: transparent;
+  background-image: linear-gradient(#0c0818, #0c0818), conic-gradient(from 0deg, #ff3d7a, #ffb238, #4fd8c8, #9b6bff, #ff3d7a);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  animation: mythicPulseRingFull 2.4s ease-in-out infinite;
+}
+.modal-art-frame.holo::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.24) 48%, rgba(255,255,255,0.24) 52%, transparent 70%);
+  background-size: 250% 250%;
+  animation: holosheen 2.6s ease-in-out infinite;
+  mix-blend-mode: overlay;
+  pointer-events: none;
 }
 .modal-art-frame .card-art-svg { width: 100%; height: 100%; display: block; }
+.modal-rarity-pill {
+  display: block;
+  width: fit-content;
+  margin: 0 auto 6px;
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: 11.5px;
+  letter-spacing: 0.4px;
+  padding: 4px 13px;
+  border-radius: 999px;
+  color: #0c0818;
+  background: linear-gradient(135deg, var(--tc), color-mix(in srgb, var(--tc) 60%, white));
+  box-shadow: 0 2px 10px -2px var(--tc);
+}
 .modal-card-name {
   text-align: center;
   font-family: var(--font-display);
-  font-size: 21px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--text);
   margin-bottom: 8px;
+  text-shadow: 0 0 20px color-mix(in srgb, var(--rc) 45%, transparent);
 }
-.modal-card-tags { display: flex; justify-content: center; gap: 8px; margin-bottom: 16px; }
+.modal-card-tags { display: flex; justify-content: center; gap: 8px; margin-bottom: 18px; }
 .tag {
   border: 1px solid var(--tc, var(--border-bright));
   color: var(--tc, var(--text));
-  background: color-mix(in srgb, var(--tc, #333) 14%, transparent);
-  padding: 4px 11px;
+  background: color-mix(in srgb, var(--tc, #333) 16%, transparent);
+  padding: 4px 12px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
@@ -1053,15 +1126,27 @@ html, body {
   text-align: center;
   background: var(--panel-2);
   border: 1px solid var(--border);
+  border-top: 2px solid var(--sc, var(--border-bright));
   border-radius: 12px;
-  padding: 8px 4px;
-  display: flex; flex-direction: column; gap: 2px;
+  padding: 10px 4px 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
 }
-.stat-box .lbl { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
-.stat-box .val { font-family: var(--font-mono); font-weight: 700; font-size: 17px; color: var(--text); }
-.stat-box .val.atk { color: var(--accent-blood); }
-.stat-box .val.hp { color: var(--accent-teal); }
-.modal-section { margin-bottom: 14px; }
+.stat-box .ic { font-size: 15px; line-height: 1; opacity: 0.9; }
+.stat-box .val { font-family: var(--font-mono); font-weight: 700; font-size: 19px; color: var(--text); }
+.stat-box .lbl { font-size: 9.5px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-box.cost { --sc: var(--accent-gold); }
+.stat-box.cost .val { color: var(--accent-gold); }
+.stat-box.atk { --sc: var(--accent-blood); }
+.stat-box.atk .val { color: var(--accent-blood); }
+.stat-box.hp { --sc: var(--accent-teal); }
+.stat-box.hp .val { color: var(--accent-teal); }
+.modal-section {
+  margin-bottom: 14px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
 .modal-section-title {
   font-family: var(--font-head);
   font-weight: 700;

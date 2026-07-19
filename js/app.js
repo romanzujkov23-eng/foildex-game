@@ -131,10 +131,17 @@ function toast(msg) {
 const ABILITY_ICON = { none: '', shield: '🛡', poison: '☠', heal: '✚', doubleStrike: '⚔⚔', drain: '🩸' };
 const RARITY_ICON = { common: '●', uncommon: '◆', rare: '★', epic: '✦✦', legendary: '♛', mythic: '✵' };
 
+/**
+ * opts.compact — упрощённый режим для руки в бою: только цена, имя,
+ * атака/здоровье. Никаких доп.бейджей и кнопки ⓘ (там сейчас не время
+ * листать лор-энциклопедию), и НЕ вешает свой клик — только переданный
+ * onClick, чтобы клик по карте делал ровно одно действие.
+ */
 function buildCardNode(card, opts = {}) {
-  const { locked = false, count = null, onClick = null, selected = false, variant = 'mini' } = opts;
+  const { locked = false, count = null, onClick = null, selected = false, variant = 'mini', compact = false } = opts;
   const el = document.createElement('div');
   el.className = `card card--${variant} rarity-${card.rarity}`;
+  if (compact) el.classList.add('card--compact');
   if (STANDOUT_RARITIES.includes(card.rarity) && !locked) el.classList.add('holo');
   if (card.rarity === 'mythic' && !locked) el.classList.add('mythic-fx');
   if (locked) el.classList.add('locked');
@@ -143,45 +150,46 @@ function buildCardNode(card, opts = {}) {
   const hasAbility = card.ability !== 'none';
   const artHtml = locked ? '<span class="card-art-locked">✦</span>' : CardArt.render(card);
   const elInfo = ELEMENTS[card.element];
-  const rarityBadge = `<span class="card-rarity-badge" style="--tc:${RARITIES[card.rarity].color}"><span class="ric">${RARITY_ICON[card.rarity]}</span></span>`;
-  const elementBadge = `<span class="card-element-badge" style="--tc:${elInfo.color}">${elInfo.emoji}</span>`;
 
   if (variant === 'full') {
     el.innerHTML = `
       <div class="card-inner">
         <div class="card-top">
           <span class="card-cost">${card.cost}</span>
-          ${elementBadge}
-          ${rarityBadge}
         </div>
         <div class="card-art">${artHtml}</div>
-        <div class="card-name-plate"><div class="card-name">${locked ? '???' : card.name}</div></div>
-        <div class="card-ability-line">${locked ? '' : (hasAbility ? `<span class="ab-ic">${ABILITY_ICON[card.ability]}</span> ${ABILITIES[card.ability].label}` : '<span class="ab-none">—</span>')}</div>
+        <div class="card-name-plate">
+          <div class="card-name">${locked ? '???' : card.name}</div>
+          ${!locked ? `<span class="card-el-tag" style="--tc:${elInfo.color}">${elInfo.emoji} ${elInfo.label}</span>` : ''}
+        </div>
+        <div class="card-ability-line">${locked ? '' : (hasAbility ? `<span class="ab-ic">${ABILITY_ICON[card.ability]}</span> ${ABILITIES[card.ability].label}` : '<span class="ab-none">Без способности</span>')}</div>
         <div class="card-stats">
           <span class="atk">${card.attack}</span>
           <span class="hp">${card.health}</span>
         </div>
       </div>
-      ${!locked ? `<button type="button" class="card-info-btn" aria-label="Подробнее о карте">ⓘ</button>` : ''}
+      ${!locked && !compact ? `<button type="button" class="card-info-btn" aria-label="Подробнее о карте">ⓘ</button>` : ''}
     `;
   } else {
-    /* mini: арт занимает всю карту, имя и статы — единой плашкой снизу */
+    /* mini: арт занимает всю карту; единственные плавающие бейджи —
+       цена (верх-лево) и количество копий (верх-право, если есть) */
     el.innerHTML = `
       <div class="card-art">${artHtml}</div>
       <div class="card-top">
         <span class="card-cost">${card.cost}</span>
-        ${!locked ? elementBadge : ''}
-        ${!locked ? rarityBadge : ''}
       </div>
       ${!locked ? `
         <div class="card-scrim">
-          <div class="card-name">${card.name}</div>
+          <div class="card-name-row">
+            ${!compact ? `<span class="card-el-ic" style="--tc:${elInfo.color}">${elInfo.emoji}</span>` : ''}
+            <div class="card-name">${card.name}</div>
+          </div>
           <div class="card-stats">
             <span class="atk">${card.attack}</span>
             <span class="hp">${card.health}</span>
           </div>
         </div>
-        <button type="button" class="card-info-btn" aria-label="Подробнее о карте">ⓘ</button>
+        ${!compact ? `<button type="button" class="card-info-btn" aria-label="Подробнее о карте">ⓘ</button>` : ''}
       ` : ''}
     `;
   }
@@ -195,7 +203,7 @@ function buildCardNode(card, opts = {}) {
   }
 
   if (onClick) { el.addEventListener('click', onClick); }
-  if (!locked) {
+  if (!locked && !compact) {
     const infoBtn = el.querySelector('.card-info-btn');
     if (infoBtn) {
       infoBtn.addEventListener('click', (e) => { e.stopPropagation(); openCardModal(card); });
@@ -204,6 +212,8 @@ function buildCardNode(card, opts = {}) {
       el.classList.add('tappable');
       el.addEventListener('click', () => openCardModal(card));
     }
+  } else if (compact) {
+    el.classList.add('tappable');
   }
   return el;
 }
@@ -212,6 +222,7 @@ function buildCardNode(card, opts = {}) {
 
 function openCardModal(card) {
   const modal = document.getElementById('card-modal');
+  const sheet = document.getElementById('card-modal-sheet');
   const body = document.getElementById('card-modal-body');
   const elInfo = ELEMENTS[card.element];
   const rarity = RARITIES[card.rarity];
@@ -219,17 +230,20 @@ function openCardModal(card) {
   const hasAbility = card.ability !== 'none';
   const abilityFull = hasAbility ? ABILITIES[card.ability].desc(card.value) : 'Эта карта не обладает особой способностью — полагается на грубую силу в бою.';
 
+  sheet.className = `card-modal-sheet rarity-${card.rarity}`;
+  sheet.style.setProperty('--rc', rarity.color);
+
   body.innerHTML = `
-    <div class="modal-art-frame rarity-${card.rarity}">${CardArt.render(card)}</div>
+    <div class="modal-art-frame rarity-${card.rarity}${STANDOUT_RARITIES.includes(card.rarity) ? ' holo' : ''}">${CardArt.render(card)}</div>
+    <div class="modal-rarity-pill" style="--tc:${rarity.color}">${RARITY_ICON[card.rarity]} ${rarity.label}</div>
     <div class="modal-card-name">${card.name}</div>
     <div class="modal-card-tags">
       <span class="tag" style="--tc:${elInfo.color}">${elInfo.emoji} ${elInfo.label}</span>
-      <span class="tag" style="--tc:${rarity.color}">${rarity.label}</span>
     </div>
     <div class="modal-card-stats">
-      <div class="stat-box"><span class="lbl">Стоимость</span><span class="val">${card.cost}</span></div>
-      <div class="stat-box"><span class="lbl">Атака</span><span class="val atk">${card.attack}</span></div>
-      <div class="stat-box"><span class="lbl">Здоровье</span><span class="val hp">${card.health}</span></div>
+      <div class="stat-box cost"><span class="ic">💠</span><span class="val">${card.cost}</span><span class="lbl">Мана</span></div>
+      <div class="stat-box atk"><span class="ic">⚔</span><span class="val">${card.attack}</span><span class="lbl">Атака</span></div>
+      <div class="stat-box hp"><span class="ic">♥</span><span class="val">${card.health}</span><span class="lbl">Здоровье</span></div>
     </div>
     <div class="modal-section">
       <div class="modal-section-title">${hasAbility ? ABILITY_ICON[card.ability] + ' Способность · ' + ABILITIES[card.ability].label : 'Способность'}</div>
@@ -704,6 +718,17 @@ function renderBattleScreen() {
   const isPlayerTurn = s.turn === 'player' && !s.over;
   const attackerSelected = !!selectedAttackerUid;
 
+  const hint = document.getElementById('bf-hint');
+  if (attackerSelected) {
+    hint.textContent = '👉 Коснись существа или лица соперника, чтобы атаковать';
+    hint.classList.add('show');
+  } else if (isPlayerTurn && s.player.board.some(u => BattleSystem.canAttack(s, 'player', u.uid))) {
+    hint.textContent = '⚔️ Есть существа, готовые атаковать — коснись одного';
+    hint.classList.add('show');
+  } else {
+    hint.classList.remove('show');
+  }
+
   // вражеское поле — цели для атаки, если выбран атакующий
   const enemyBoard = document.getElementById('bf-enemy-board');
   enemyBoard.innerHTML = '';
@@ -764,18 +789,21 @@ function renderBattleScreen() {
   handRow.innerHTML = '';
   s.player.hand.forEach(card => {
     const affordable = isPlayerTurn && BattleSystem.canPlay(s, 'player', card.uid);
-    const node = buildCardNode(card, { variant: 'mini' });
+    const node = buildCardNode(card, {
+      variant: 'mini',
+      compact: true,
+      onClick: () => {
+        if (!affordable) { if (isPlayerTurn) toast('Не хватает маны или поле заполнено'); return; }
+        BattleSystem.playCard(s, 'player', card.uid);
+        haptic('light');
+        SoundSystem.tap();
+        renderBattleScreen();
+        flushBattleLog();
+        checkBattleOver();
+      },
+    });
     node.classList.add('hand-card');
     if (!affordable) node.classList.add('unaffordable');
-    node.onclick = () => {
-      if (!affordable) { if (isPlayerTurn) toast('Не хватает маны или поле заполнено'); return; }
-      BattleSystem.playCard(s, 'player', card.uid);
-      haptic('light');
-      SoundSystem.tap();
-      renderBattleScreen();
-      flushBattleLog();
-      checkBattleOver();
-    };
     handRow.appendChild(node);
   });
 
