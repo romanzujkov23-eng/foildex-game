@@ -92,7 +92,7 @@ function addCardsToCollection(cards) {
 
 /* ---------------- NAVIGATION ---------------- */
 
-const TAB_SCREENS = { home: 'screen-home', collection: 'screen-collection', battle: 'screen-battle-setup' };
+const TAB_SCREENS = { home: 'screen-home', collection: 'screen-collection', shop: 'screen-shop', battle: 'screen-battle-setup' };
 
 function showScreen(id, opts = {}) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -241,7 +241,7 @@ function openCardModal(card) {
       <span class="tag" style="--tc:${elInfo.color}">${elInfo.emoji} ${elInfo.label}</span>
     </div>
     <div class="modal-card-stats">
-      <div class="stat-box cost"><span class="ic">💠</span><span class="val">${card.cost}</span><span class="lbl">Мана</span></div>
+      <div class="stat-box cost"><span class="ic">${Icon('mana',{size:15})}</span><span class="val">${card.cost}</span><span class="lbl">Мана</span></div>
       <div class="stat-box atk"><span class="ic">⚔</span><span class="val">${card.attack}</span><span class="lbl">Атака</span></div>
       <div class="stat-box hp"><span class="ic">♥</span><span class="val">${card.health}</span><span class="lbl">Здоровье</span></div>
     </div>
@@ -257,6 +257,56 @@ function openCardModal(card) {
 
 function closeCardModal() {
   document.getElementById('card-modal').classList.remove('active');
+}
+
+/* ---------------- RULES MODAL ---------------- */
+
+function openRulesModal() {
+  const body = document.getElementById('rules-modal-body');
+  const elList = Object.entries(ELEMENTS).map(([key, e]) =>
+    `<span class="rules-el-chip" style="--tc:${e.color}">${Icon(ELEMENT_ICON[key], { size: 14 })}${e.label}</span>`
+  ).join('');
+
+  body.innerHTML = `
+    <div class="rules-hero">${Icon('book', { size: 30 })}<div class="modal-card-name" style="margin:8px 0 0;">Правила боя</div></div>
+
+    <div class="rules-row">
+      <div class="rules-ic">${Icon('mana', { size: 20 })}</div>
+      <div><b>Мана.</b> Растёт на 1 каждый ход (максимум 10). Разыгрывай карты из руки, пока хватает маны — цена показана в кружке на карте.</div>
+    </div>
+    <div class="rules-row">
+      <div class="rules-ic">${Icon('cards', { size: 20 })}</div>
+      <div><b>Рука и поле.</b> Каждый ход добираешь карту. Разыгранные существа выходят на поле (максимум 6) — новый юнит не может атаковать в тот же ход, когда вышел.</div>
+    </div>
+    <div class="rules-row">
+      <div class="rules-ic">${Icon('swords', { size: 20 })}</div>
+      <div><b>Атака.</b> Коснись готового существа, затем — цель: существо соперника или его портрет напрямую. При ударе по существу оба бойца бьют друг друга одновременно.</div>
+    </div>
+    <div class="rules-row">
+      <div class="rules-ic">${Icon('bolt', { size: 20 })}</div>
+      <div><b>Стихии.</b> Вода → Огонь → Природа → Вода, Свет → Тень → Молния → Свет. Атака "своей" стихией по слабой даёт +30% урона.
+        <div class="rules-el-list">${elList}</div>
+      </div>
+    </div>
+    <div class="rules-row">
+      <div class="rules-ic">${Icon('target', { size: 20 })}</div>
+      <div><b>Победа.</b> Опусти здоровье соперника до нуля. Если в колоде закончились карты — начинается урон истощения.</div>
+    </div>
+
+    <div class="modal-section-title" style="margin-top:14px;">Способности карт</div>
+    ${Object.entries(ABILITIES).map(([key, a]) => key === 'none' ? '' : `
+      <div class="rules-row small">
+        <div class="rules-ic">${Icon(ABILITY_ICON_NAME[key], { size: 16 })}</div>
+        <div><b>${a.label}.</b> ${a.desc('X')}</div>
+      </div>
+    `).join('')}
+  `;
+  document.getElementById('rules-modal').classList.add('active');
+  haptic('light');
+}
+
+function closeRulesModal() {
+  document.getElementById('rules-modal').classList.remove('active');
 }
 
 /* ---------------- HOME ---------------- */
@@ -286,7 +336,7 @@ function renderHome() {
         <span>№1</span>
       </div>
       <div>
-        <div class="home-cover-badge">📖 ${uniqueOwned} / ${CARDS.length} существ поймано</div>
+        <div class="home-cover-badge">${Icon('grimoire',{size:13})} ${uniqueOwned} / ${CARDS.length} существ поймано</div>
         <div class="home-cover-title">ЛОГОВО<br>ТЕНЕЙ</div>
         <p class="home-cover-sub">Побеждай в боях, собирай кристаллы душ и вскрывай бустеры — гримуар ждёт, чтобы его заполнили.</p>
       </div>
@@ -305,7 +355,7 @@ function renderHome() {
       const card = document.createElement('div');
       card.className = 'quick-card';
       card.innerHTML = `
-        <div class="qc-icon">✦</div>
+        <div class="qc-icon">${Icon('coin',{size:20})}</div>
         <div class="qc-title">Дар подземелья</div>
         <div class="qc-desc">Забери просто за то, что вернулся.</div>
       `;
@@ -329,7 +379,7 @@ function renderHome() {
       const card = document.createElement('div');
       card.className = 'quick-card';
       card.innerHTML = `
-        <div class="qc-icon">🕯</div>
+        <div class="qc-icon">${Icon('cards',{size:20})}</div>
         <div class="qc-title">Бесплатный бустер</div>
         <div class="qc-desc">Доступно: ${state.freeBoosters} шт.</div>
       `;
@@ -349,23 +399,19 @@ function renderHome() {
   el.appendChild(shopTitle);
 
   const shopPanel = document.createElement('div');
-  shopPanel.className = 'panel';
-  const row = document.createElement('div');
-  row.className = 'pack-shop-item';
-  row.innerHTML = `
-    <div class="pack-icon">📜</div>
+  shopPanel.className = 'panel shop-promo';
+  shopPanel.innerHTML = `
+    <div class="pack-icon">${Icon('cards', { size: 26 })}</div>
     <div class="pack-info">
-      <div class="name">Тёмный бустер</div>
-      <div class="desc">5 карт · шанс на мифическую и «везучий» бустер ✵</div>
+      <div class="name">Разные бустеры ждут в Лавке</div>
+      <div class="desc">Обычные, премиум и мифические — выбирай свою удачу</div>
     </div>
   `;
-  const buyBtn = document.createElement('button');
-  buyBtn.className = 'pack-buy';
-  buyBtn.innerHTML = `${BOOSTER_COST} ${COIN_ICON}`;
-  buyBtn.disabled = state.shards < BOOSTER_COST;
-  buyBtn.onclick = () => { SoundSystem.tap(); startPackFlow({ free: false }); };
-  row.appendChild(buyBtn);
-  shopPanel.appendChild(row);
+  const goBtn = document.createElement('button');
+  goBtn.className = 'pack-buy';
+  goBtn.textContent = 'Открыть →';
+  goBtn.onclick = () => { SoundSystem.tap(); showScreen('screen-shop'); renderShop(); };
+  shopPanel.appendChild(goBtn);
   el.appendChild(shopPanel);
 
   const statsTitle = document.createElement('div');
@@ -374,7 +420,7 @@ function renderHome() {
   el.appendChild(statsTitle);
   const statsPanel = document.createElement('div');
   statsPanel.className = 'panel';
-  statsPanel.innerHTML = `<p class="hero-sub" style="margin:0;">🏆 Побед: ${state.wins} &nbsp;·&nbsp; 💀 Поражений: ${state.losses}</p>`;
+  statsPanel.innerHTML = `<p class="hero-sub stats-line" style="margin:0;">${Icon('trophy',{size:14})} Побед: ${state.wins} &nbsp;·&nbsp; ${Icon('skull',{size:14})} Поражений: ${state.losses}</p>`;
   el.appendChild(statsPanel);
 }
 
@@ -407,12 +453,62 @@ function renderCollection() {
   });
 }
 
+/* ---------------- SHOP ---------------- */
+
+function renderShop() {
+  const el = document.getElementById('shop-content');
+  el.innerHTML = '';
+
+  const intro = document.createElement('div');
+  intro.className = 'panel';
+  intro.innerHTML = `<div class="hero-title" style="font-size:16px;">Лавка бустеров</div>
+    <p class="hero-sub">Чем выше порог редкости — тем меньше карт впустую, но и дороже печать.</p>`;
+  el.appendChild(intro);
+
+  if (state.freeBoosters > 0) {
+    const freeCard = document.createElement('div');
+    freeCard.className = 'shop-item-card free';
+    freeCard.innerHTML = `
+      <div class="shop-item-icon" style="--ac:#4fbe7e">${Icon('cards', { size: 28 })}</div>
+      <div class="shop-item-body">
+        <div class="shop-item-name">Бесплатный бустер</div>
+        <div class="shop-item-desc">5 карт · честные шансы · доступно: ${state.freeBoosters}</div>
+      </div>
+      <button class="shop-item-buy free-buy">Открыть</button>
+    `;
+    freeCard.querySelector('.free-buy').onclick = () => { SoundSystem.tap(); startPackFlow({ free: true, packTypeId: 'standard' }); };
+    el.appendChild(freeCard);
+  }
+
+  Object.values(PACK_TYPES).forEach(pt => {
+    const card = document.createElement('div');
+    card.className = 'shop-item-card';
+    const affordable = state.shards >= pt.cost;
+    card.innerHTML = `
+      <div class="shop-item-icon" style="--ac:${pt.accent}">${Icon(pt.icon, { size: 28 })}</div>
+      <div class="shop-item-body">
+        <div class="shop-item-name">${pt.name}</div>
+        <div class="shop-item-desc">${pt.desc}</div>
+      </div>
+      <button class="shop-item-buy" ${affordable ? '' : 'disabled'}>${pt.cost} ${COIN_ICON}</button>
+    `;
+    card.querySelector('.shop-item-buy').onclick = () => {
+      if (!affordable) return;
+      SoundSystem.tap();
+      startPackFlow({ free: false, packTypeId: pt.id });
+    };
+    el.appendChild(card);
+  });
+}
+
 /* ---------------- PACK OPENING ---------------- */
 
 let pendingCards = [];
 let pendingIsLucky = false;
 let revealIndex = 0;
 let pendingPaymentDone = false;
+let pendingPackType = null;
+let pendingIsFree = false;
 
 function renderPityPanel() {
   const panel = document.getElementById('pity-panel');
@@ -425,24 +521,28 @@ function renderPityPanel() {
   `;
 }
 
-function startPackFlow({ free }) {
+function startPackFlow({ free = false, packTypeId = 'standard' } = {}) {
+  const packType = getPackType(packTypeId);
   if (free) {
     if (state.freeBoosters <= 0) return;
   } else {
-    if (state.shards < BOOSTER_COST) return;
+    if (state.shards < packType.cost) return;
   }
   pendingPaymentDone = false;
+  pendingPackType = packType;
+  pendingIsFree = free;
   showScreen('screen-pack');
   document.getElementById('pack-intro').style.display = 'flex';
   document.getElementById('reveal-stage').classList.remove('active');
   document.getElementById('lucky-banner').classList.remove('show');
   const visual = document.getElementById('pack-visual');
   visual.classList.remove('opening');
-  visual.onclick = () => openPack({ free });
+  visual.onclick = () => openPack();
+  document.getElementById('pack-name-label').textContent = packType.name;
   renderPityPanel();
 }
 
-async function openPack({ free }) {
+async function openPack() {
   if (pendingPaymentDone) return;
   pendingPaymentDone = true;
   haptic('medium');
@@ -451,9 +551,9 @@ async function openPack({ free }) {
   const visual = document.getElementById('pack-visual');
   visual.classList.add('opening');
 
-  if (free) { state.freeBoosters -= 1; } else { state.shards -= BOOSTER_COST; }
+  if (pendingIsFree) { state.freeBoosters -= 1; } else { state.shards -= pendingPackType.cost; }
 
-  const result = PackSystem.openBooster(state);
+  const result = PackSystem.openBooster(state, pendingPackType);
   pendingCards = result.cards;
   pendingIsLucky = result.isLucky;
   await saveState();
@@ -485,7 +585,7 @@ function showRevealCard() {
   document.getElementById('reveal-progress').textContent = `Карта ${revealIndex + 1} / ${pendingCards.length}`;
 
   const wasOwned = ownedCount(card.id) > 0;
-  document.getElementById('reveal-new-tag').textContent = wasOwned ? '' : '✨ НОВАЯ КАРТА';
+  document.getElementById('reveal-new-tag').textContent = wasOwned ? '' : 'НОВАЯ КАРТА';
 
   const flash = document.getElementById('reveal-flash');
   flash.className = 'reveal-flash';
@@ -523,7 +623,7 @@ function renderLevelSelect() {
   const owned = ownedUniqueCards();
   if (owned.length < MIN_DECK_SIZE) {
     el.innerHTML = `<div class="empty-state">
-      <div class="big">🃏</div>
+      <div class="big">${Icon('cards',{size:34})}</div>
       <p>Нужно минимум ${MIN_DECK_SIZE} разных карт в коллекции, чтобы собрать боевую колоду.<br>Открой ещё бустеров!</p>
     </div>`;
     return;
@@ -548,16 +648,16 @@ function renderLevelSelect() {
     card.className = 'level-card' + (level.isBoss ? ' boss' : '') + (unlocked ? '' : ' locked') + (cleared ? ' cleared' : '');
     card.disabled = !unlocked;
     card.innerHTML = `
-      <div class="level-num">${level.isBoss ? '👑' : level.id}</div>
+      <div class="level-num">${level.isBoss ? Icon('crown',{size:16}) : level.id}</div>
       <div class="level-info">
         <div class="level-name">${unlocked ? level.name : '???'}</div>
         <div class="level-meta">
           ${unlocked ? `<span class="tag-sm" style="--tc:${elInfo.color}">${elInfo.emoji} ${elInfo.label}</span>` : ''}
-          ${unlocked ? `<span class="tag-sm">❤ ${level.faceHp}</span>` : ''}
+          ${unlocked ? `<span class="tag-sm">${Icon('heart',{size:10})} ${level.faceHp}</span>` : ''}
           ${unlocked ? `<span class="tag-sm gold">💰 ${level.goldMin}–${level.goldMax}</span>` : ''}
         </div>
       </div>
-      <div class="level-status">${cleared ? '✅' : (unlocked ? '▶' : '🔒')}</div>
+      <div class="level-status">${cleared ? Icon('check',{size:15}) : (unlocked ? Icon('play',{size:13}) : Icon('lock',{size:14}))}</div>
     `;
     if (unlocked) {
       card.onclick = () => {
@@ -589,17 +689,17 @@ function renderDeckBuilder() {
   const enemyPanel = document.createElement('div');
   enemyPanel.className = 'panel';
   enemyPanel.innerHTML = `
-    <div class="hero-title" style="font-size:16px;">${level.isBoss ? '👑 ' : ''}${level.name}</div>
+    <div class="hero-title" style="font-size:16px; display:flex; align-items:center; gap:6px;">${level.isBoss ? Icon('crown',{size:16}) : ''}${level.name}</div>
     <div class="level-meta" style="margin:6px 0 10px;">
       <span class="tag-sm" style="--tc:${elInfo.color}">${elInfo.emoji} ${elInfo.label}</span>
-      <span class="tag-sm">❤ ${level.faceHp}</span>
-      <span class="tag-sm">🃏 ${level.deckSize} карт</span>
+      <span class="tag-sm">${Icon('heart',{size:10})} ${level.faceHp}</span>
+      <span class="tag-sm">${Icon('cards',{size:10})} ${level.deckSize} карт</span>
       <span class="tag-sm gold">💰 ${level.goldMin}–${level.goldMax}</span>
     </div>
     <div class="matchup-banner matchup-${matchup.state}">
-      ${matchup.state === 'favor' ? `✅ Твоя стихия (${playerDom ? ELEMENTS[playerDom].label : '?'}) сильнее ${elInfo.label} — бонус к урону в бою!` : ''}
-      ${matchup.state === 'against' ? `⚠️ Стихия соперника (${elInfo.label}) сильнее твоей (${playerDom ? ELEMENTS[playerDom].label : '?'}) — будь осторожен` : ''}
-      ${matchup.state === 'neutral' ? `⚖️ Нейтральный матчап стихий` : ''}
+      ${matchup.state === 'favor' ? `${Icon('check',{size:12})} Твоя стихия (${playerDom ? ELEMENTS[playerDom].label : '?'}) сильнее ${elInfo.label} — бонус к урону в бою!` : ''}
+      ${matchup.state === 'against' ? `${Icon('shield',{size:12})} Стихия соперника (${elInfo.label}) сильнее твоей (${playerDom ? ELEMENTS[playerDom].label : '?'}) — будь осторожен` : ''}
+      ${matchup.state === 'neutral' ? `${Icon('swords',{size:12})} Нейтральный матчап стихий` : ''}
     </div>
   `;
   el.appendChild(enemyPanel);
@@ -705,11 +805,11 @@ function renderBattleScreen() {
   if (!battleState) return;
   const s = battleState;
 
-  document.getElementById('bf-enemy-name').textContent = (s.level.isBoss ? '👑 ' : '') + s.level.name;
+  document.getElementById('bf-enemy-name').innerHTML = (s.level.isBoss ? Icon('crown',{size:13}) + ' ' : '') + s.level.name;
   const ePct = Math.max(0, Math.round((s.ai.faceHp / s.ai.faceMaxHp) * 100));
   document.getElementById('bf-enemy-hp-fill').style.width = ePct + '%';
   document.getElementById('bf-enemy-hp-text').textContent = `${Math.max(0, s.ai.faceHp)}/${s.ai.faceMaxHp}`;
-  document.getElementById('bf-enemy-deck-count').textContent = `🂠 ${s.ai.deck.length}`;
+  document.getElementById('bf-enemy-deck-count').innerHTML = `${Icon('deckBack',{size:11})} ${s.ai.deck.length}`;
 
   const pPct = Math.max(0, Math.round((s.player.faceHp / s.player.faceMaxHp) * 100));
   document.getElementById('bf-player-hp-fill').style.width = pPct + '%';
@@ -717,17 +817,6 @@ function renderBattleScreen() {
 
   const isPlayerTurn = s.turn === 'player' && !s.over;
   const attackerSelected = !!selectedAttackerUid;
-
-  const hint = document.getElementById('bf-hint');
-  if (attackerSelected) {
-    hint.textContent = '👉 Коснись существа или лица соперника, чтобы атаковать';
-    hint.classList.add('show');
-  } else if (isPlayerTurn && s.player.board.some(u => BattleSystem.canAttack(s, 'player', u.uid))) {
-    hint.textContent = '⚔️ Есть существа, готовые атаковать — коснись одного';
-    hint.classList.add('show');
-  } else {
-    hint.classList.remove('show');
-  }
 
   // вражеское поле — цели для атаки, если выбран атакующий
   const enemyBoard = document.getElementById('bf-enemy-board');
@@ -865,7 +954,7 @@ function checkBattleOver() {
   const card = document.getElementById('battle-result-card');
   const nextLevel = getLevel(level.id + 1);
   card.innerHTML = `
-    <div class="battle-result ${won ? 'win' : 'lose'}">${won ? (level.isBoss ? '👑 Босс повержен!' : 'Победа!') : 'Поражение'}</div>
+    <div class="battle-result ${won ? 'win' : 'lose'}">${won ? (level.isBoss ? Icon('crown',{size:22})+' Босс повержен!' : 'Победа!') : 'Поражение'}</div>
     <p class="hero-sub" style="text-align:center;">+${reward} ${COIN_ICON}</p>
     <div class="battle-result-actions">
       <button class="btn ghost" id="battle-result-map-btn">К карте</button>
@@ -893,6 +982,10 @@ function checkBattleOver() {
 /* ---------------- INIT ---------------- */
 
 function bindStaticEvents() {
+  document.querySelectorAll('[data-icon]').forEach(el => {
+    el.innerHTML = Icon(el.dataset.icon, { size: el.dataset.iconSize ? +el.dataset.iconSize : 18 });
+  });
+
   document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
       SoundSystem.tap();
@@ -900,6 +993,7 @@ function bindStaticEvents() {
       showScreen(TAB_SCREENS[key]);
       if (key === 'home') renderHome();
       if (key === 'collection') renderCollection();
+      if (key === 'shop') renderShop();
       if (key === 'battle') renderLevelSelect();
     });
   });
@@ -907,7 +1001,7 @@ function bindStaticEvents() {
   document.getElementById('sound-toggle-btn').addEventListener('click', async (e) => {
     state.soundOn = !state.soundOn;
     SoundSystem.setEnabled(state.soundOn);
-    e.currentTarget.textContent = state.soundOn ? '🔊' : '🔇';
+    e.currentTarget.innerHTML = state.soundOn ? Icon('speakerOn',{size:16}) : Icon('speakerOff',{size:16});
     if (state.soundOn) SoundSystem.tap();
     await saveState();
   });
@@ -945,6 +1039,10 @@ function bindStaticEvents() {
 
   if (tg && tg.BackButton) {
     tg.BackButton.onClick(() => {
+      if (document.getElementById('rules-modal').classList.contains('active')) {
+        closeRulesModal();
+        return;
+      }
       if (document.getElementById('card-modal').classList.contains('active')) {
         closeCardModal();
         return;
@@ -963,6 +1061,15 @@ function bindStaticEvents() {
   document.getElementById('card-modal').addEventListener('click', (e) => {
     if (e.target.id === 'card-modal') closeCardModal();
   });
+
+  document.getElementById('levels-rules-btn').innerHTML = Icon('book', { size: 16 });
+  document.getElementById('battle-rules-btn').innerHTML = Icon('book', { size: 16 });
+  document.getElementById('levels-rules-btn').addEventListener('click', () => { SoundSystem.tap(); openRulesModal(); });
+  document.getElementById('battle-rules-btn').addEventListener('click', () => { SoundSystem.tap(); openRulesModal(); });
+  document.getElementById('rules-modal-close').addEventListener('click', closeRulesModal);
+  document.getElementById('rules-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'rules-modal') closeRulesModal();
+  });
 }
 
 async function init() {
@@ -973,7 +1080,7 @@ async function init() {
   }
   await loadState();
   bindStaticEvents();
-  document.getElementById('sound-toggle-btn').textContent = state.soundOn ? '🔊' : '🔇';
+  document.getElementById('sound-toggle-btn').innerHTML = state.soundOn ? Icon('speakerOn',{size:16}) : Icon('speakerOff',{size:16});
   showScreen('screen-home');
   renderHome();
   await saveState();

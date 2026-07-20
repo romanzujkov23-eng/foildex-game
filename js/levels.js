@@ -32,6 +32,81 @@ const LEVELS = [
   { id: 20, name: 'Король Небесного Пламени', element: 'light',  isBoss: true,  pool: ['epic', 'legendary', 'mythic'],         deckSize: 12, faceHp: 60, goldMin: 380, goldMax: 460 },
 ];
 
+/* ----------------------------------------------------------
+   Главы 3-10 (уровни 21-100) — сгенерированы формулой, чтобы
+   Арена была по-настоящему длинной, без ручного набора 80 строк.
+   Каждая глава — 10 уровней одной стихии, 10-й — предводитель главы.
+   ---------------------------------------------------------- */
+
+const ELEMENT_CYCLE = ['fire', 'water', 'nature', 'electric', 'shadow', 'light'];
+// главы 2..7 (id 21-80) — по одной стихии на главу, как и в главах 0-1;
+// главы 8-9 (id 81-100) — хаотичные, стихии чередуются внутри главы
+const CHAPTER_ELEMENT = { 2: 'fire', 3: 'water', 4: 'nature', 5: 'electric', 6: 'shadow', 7: 'light' };
+const RARITY_ORDER_L = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
+
+const FODDER_ADJ = [
+  'Иссохший', 'Безымянный', 'Проклятый', 'Забытый', 'Кровавый', 'Сумеречный', 'Отверженный',
+  'Безумный', 'Одержимый', 'Падший', 'Взбешённый', 'Скорбный', 'Пепельный', 'Костяной',
+  'Ядовитый', 'Разорённый', 'Неупокоенный', 'Бродячий', 'Заклятый', 'Мятежный', 'Ветхий', 'Клятый',
+];
+const FODDER_ROLE = [
+  'Головорез', 'Мародёр', 'Наёмник', 'Ловчий', 'Страж', 'Заклинатель', 'Палач', 'Отступник',
+  'Служитель', 'Изгой', 'Скиталец', 'Жрец', 'Вестник', 'Клинок', 'Охотник', 'Кузнец',
+  'Пилигрим', 'Костоправ', 'Разоритель', 'Штурмовик',
+];
+
+const CHAPTER_BOSSES = {
+  30:  'Повелитель Испепеляющих Легионов',
+  40:  'Архонт Ледяной Пучины',
+  50:  'Патриарх Гниющих Чащоб',
+  60:  'Владыка Разрывающих Гроз',
+  70:  'Царь Немой Тьмы',
+  80:  'Архонт Слепящего Сияния',
+  90:  'Вестник Всепоглощающего Хаоса',
+  100: 'Изначальный Пожиратель Миров',
+};
+
+function generateLaterLevels() {
+  // детерминированная "тасовка" пар прилагательное×роль, чтобы имена
+  // не повторялись между уровнями (комбинаций 22×20=440 — с запасом)
+  const namePairs = [];
+  FODDER_ADJ.forEach(a => FODDER_ROLE.forEach(r => namePairs.push(`${a} ${r}`)));
+  let seed = 1337;
+  const rng = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  for (let i = namePairs.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [namePairs[i], namePairs[j]] = [namePairs[j], namePairs[i]];
+  }
+
+  const levels = [];
+  let nameIdx = 0;
+  for (let id = 21; id <= 100; id++) {
+    const chapter = Math.floor((id - 1) / 10);       // 2..9
+    const posInChapter = (id - 1) % 10;              // 0..9, 9 = босс главы
+    const isBoss = posInChapter === 9;
+    const element = CHAPTER_ELEMENT[chapter] || ELEMENT_CYCLE[(id + chapter) % ELEMENT_CYCLE.length];
+    const progress = (id - 21) / (100 - 21);          // 0..1 общий прогресс по хвосту Арены
+
+    // пул редкостей плавно смещается вверх; у боссов на ступень выше обычных
+    const floorIdx = Math.min(5, Math.floor(progress * 5));       // 0..5
+    const topIdx = Math.min(5, floorIdx + 2 + (isBoss ? 1 : 0));
+    const pool = RARITY_ORDER_L.slice(floorIdx, topIdx + 1);
+
+    const deckSize = Math.min(16, 12 + Math.floor(progress * 5) + (isBoss ? 1 : 0));
+    const faceHp = Math.round(48 + progress * 90 + (isBoss ? 26 : 0));
+    const goldBase = Math.round(120 + progress * 900);
+    const goldMin = isBoss ? Math.round(goldBase * 2.4) : goldBase;
+    const goldMax = isBoss ? Math.round(goldBase * 3) : Math.round(goldBase * 1.35);
+
+    const name = isBoss ? CHAPTER_BOSSES[id] : namePairs[nameIdx++ % namePairs.length];
+
+    levels.push({ id, name, element, isBoss, pool, deckSize, faceHp, goldMin, goldMax });
+  }
+  return levels;
+}
+
+LEVELS.push(...generateLaterLevels());
+
 const PLAYER_FACE_HP = 30;
 const MIN_DECK_SIZE = 8;
 const MAX_DECK_SIZE = 12;

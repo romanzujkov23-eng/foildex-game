@@ -55,6 +55,16 @@ const PackSystem = (() => {
     return RARITY_ORDER[Math.min(i + 1, RARITY_ORDER.length - 1)];
   }
 
+  // Обрезает пул редкостей снизу — ничего дешевле floorRarity не выпадет.
+  // Используется премиум/мифическими бустерами из магазина.
+  function applyFloor(pool, floorRarity) {
+    if (!floorRarity) return pool;
+    const floorIdx = RARITY_ORDER.indexOf(floorRarity);
+    const out = {};
+    Object.keys(pool).forEach(r => { if (RARITY_ORDER.indexOf(r) >= floorIdx) out[r] = pool[r]; });
+    return out;
+  }
+
   // Плавно увеличивает вес редкости по мере приближения counter к hardCap,
   // начиная с softStart. Возвращает бонусный вес (добавляется поверх базового).
   function softBoost(counter, softStart, hardCap, magnitude) {
@@ -66,19 +76,19 @@ const PackSystem = (() => {
 
   // Обычный (не гарантированный) слот — веса как в RARITIES,
   // с мягким pity-буст на epic/legendary/mythic ближе к хард-капу.
-  function rollNormalSlot(state) {
+  function rollNormalSlot(state, floorRarity) {
     const pool = {};
     RARITY_ORDER.forEach(r => pool[r] = RARITIES[r].weight);
     pool.epic      += softBoost(state.epicPity || 0,      EPIC_SOFT_PITY,      EPIC_HARD_PITY,      22);
     pool.legendary += softBoost(state.legendaryPity || 0, LEGENDARY_SOFT_PITY, LEGENDARY_HARD_PITY, 6);
     pool.mythic     += softBoost(state.mythicPity || 0,   MYTHIC_SOFT_PITY,    MYTHIC_HARD_PITY,    1.2);
-    const rarity = weightedRarity(pool);
+    const rarity = weightedRarity(applyFloor(pool, floorRarity));
     return pickCardOfRarity(rarity);
   }
 
   // Гарантированный (5-й) слот. Минимум зависит от того, какой pity
   // "горит" сильнее всего — приоритет у самого редкого хард-пити.
-  function rollGuaranteedSlot(state) {
+  function rollGuaranteedSlot(state, floorRarity) {
     const rarePity = state.pity || 0;
     const epicPity = state.epicPity || 0;
     const legendaryPity = state.legendaryPity || 0;
@@ -94,13 +104,13 @@ const PackSystem = (() => {
       return pickCardOfRarity(weightedRarity({ epic: 78, legendary: 18, mythic: 4 }));
     }
     if (rarePity >= RARE_HARD_PITY) {
-      return pickCardOfRarity(weightedRarity({ rare: 70, epic: 24, legendary: 5, mythic: 1 }));
+      return pickCardOfRarity(weightedRarity(applyFloor({ rare: 70, epic: 24, legendary: 5, mythic: 1 }, floorRarity)));
     }
 
     const pool = { uncommon: 600, rare: 250, epic: 20, legendary: 2.4, mythic: 0.4 };
     pool.legendary += softBoost(legendaryPity, LEGENDARY_SOFT_PITY, LEGENDARY_HARD_PITY, 10);
     pool.mythic     += softBoost(mythicPity, MYTHIC_SOFT_PITY, MYTHIC_HARD_PITY, 3);
-    return pickCardOfRarity(weightedRarity(pool));
+    return pickCardOfRarity(weightedRarity(applyFloor(pool, floorRarity)));
   }
 
   function updatePity(state, cards) {
@@ -119,12 +129,14 @@ const PackSystem = (() => {
   /**
    * Открывает один бустер.
    * state.pity / epicPity / legendaryPity / mythicPity — счётчики (мутируются).
+   * packType — опционально, объект вида { minRarity: 'rare' } из PACK_TYPES (shop.js).
    * Возвращает { cards: [...5 карт], isLucky: bool }
    */
-  function openBooster(state) {
+  function openBooster(state, packType) {
+    const floorRarity = packType && packType.minRarity;
     let cards = [];
-    for (let i = 0; i < 4; i++) cards.push(rollNormalSlot(state));
-    cards.push(rollGuaranteedSlot(state));
+    for (let i = 0; i < 4; i++) cards.push(rollNormalSlot(state, floorRarity));
+    cards.push(rollGuaranteedSlot(state, floorRarity));
 
     const isLucky = Math.random() < LUCKY_PACK_CHANCE;
     if (isLucky) {
